@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
+from api.auth import router as auth_router  # <-- Auth Router Import किया गया
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -16,6 +17,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# <-- Auth Router को FastAPI ऐप में शामिल किया गया
+app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 
 @app.get("/")
 async def root():
