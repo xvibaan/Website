@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from api.auth import router as auth_router  # <-- Auth Router Import किया गया
+from api.auth import router as auth_router
+from api.product import router as product_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -9,7 +10,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Strict CORS for production (configured via env variables)
+# Strict CORS for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
@@ -18,8 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# <-- Auth Router को FastAPI ऐप में शामिल किया गया
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
+app.include_router(product_router, prefix=f"{settings.API_V1_STR}/products", tags=["Products"])
 
 @app.get("/")
 async def root():
