@@ -66,7 +66,7 @@ export default function Navbar() {
                   {user.email}
                 </div>
                 <button
-                  onClick={logout}
+                  onClick={async () => await logout()}
                   className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                 >
                   <LogOut className="w-4 h-4 mr-1.5" />
@@ -152,8 +152,8 @@ export default function Navbar() {
                 </div>
                 <div className="px-2">
                   <button
-                    onClick={() => {
-                      logout();
+                    onClick={async () => {
+                      await logout();
                       setIsMobileMenuOpen(false);
                     }}
                     className="w-full flex items-center px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
