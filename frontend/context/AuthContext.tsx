@@ -9,6 +9,7 @@ import React, {
   ReactNode,
 } from "react";
 import { api } from "@/lib/api";
+import { logoutWithAction } from "@/app/logout/actions";
 
 export interface User {
   id: number;
@@ -22,7 +23,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,12 +49,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const logout = () => {
-    setUser(null);
+  const logout = async () => {
+    try {
+      // Call the Server Action to delete the HttpOnly cookie securely
+      const result = await logoutWithAction();
 
-    console.warn(
-      "User cleared from state. Server-side cookie clear is required for full logout."
-    );
+      if (result?.success) {
+        // Only clear the client-side state if the server confirms cookie deletion
+        setUser(null);
+      } else {
+        console.error("Logout failed on server:", result?.error);
+      }
+    } catch (error) {
+      console.error("Unexpected error during logout:", error);
+    }
   };
 
   return (
