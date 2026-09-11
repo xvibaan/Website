@@ -2,42 +2,56 @@
 
 import { cookies } from "next/headers";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export async function loginWithCookie(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  // FastAPI OAuth2 requires Form Data
-  const fastApiFormData = new URLSearchParams();
-  fastApiFormData.append("username", email);
-  fastApiFormData.append("password", password);
-
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: fastApiFormData.toString(),
-    });
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
-    if (!response.ok) {
-      const error = await response.json();
-      return { error: error.detail || "Invalid email or password" };
+    if (!email || !password) {
+      return { error: "Email and password are required." };
     }
 
-    const data = await response.json();
+    // FastAPI's OAuth2PasswordRequestForm strictly requires form-urlencoded data
+    // and expects the email to be mapped to the "username" field
+    const body = new URLSearchParams();
+    body.append("username", email);
+    body.append("password", password);
 
-    // Securely set HttpOnly Cookie via Next.js Server
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+    });
+
+    if (!res.ok) {
+      let errorMessage = "Invalid email or password.";
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch (e) {
+        // Fallback if parsing fails
+      }
+      return { error: errorMessage };
+    }
+
+    const data = await res.json();
+
+    // Securely set the HttpOnly cookie using Next.js cookies API
     cookies().set("access_token", data.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS in production
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60, // 1 hour (matches our FastAPI expiration)
+      maxAge: 60 * 60, // 1 hour expiration
     });
 
     return { success: true };
-  } catch (error) {
-    return { error: "Something went wrong. Please try again." };
+  } catch (error: any) {
+    console.error("Login Server Action Error:", error);
+    return { error: "An unexpected network error occurred. Please try again." };
   }
 }
