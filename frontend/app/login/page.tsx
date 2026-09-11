@@ -1,94 +1,148 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, Loader2 } from "lucide-react";
-import { loginWithCookie } from "./actions";
+import { Mail, Lock, Loader2, LogIn } from "lucide-react";
+import { loginWithCookie } from "@/app/login/actions";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const { refreshUser } = useAuth();
+  
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (formData: FormData) => {
-    setError("");
-    // useTransition keeps the UI responsive while the server action runs
-    startTransition(async () => {
+  const handleLogin = async (formData: FormData) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Call the server action. It will extract email and password natively
+      // and securely set the HttpOnly cookie on success.
       const result = await loginWithCookie(formData);
-      
+
       if (result?.error) {
         setError(result.error);
       } else if (result?.success) {
-        router.push("/");
-        router.refresh();
+        // Refresh the global user state via context so the UI knows who is logged in
+        await refreshUser();
+        
+        // Redirect to products catalog on successful login
+        router.push("/products");
       }
-    });
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md bg-card p-8 rounded-2xl border border-slate-700 shadow-xl">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
-          <p className="text-slate-400">Sign in to your account</p>
+    <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md space-y-8 bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800">
+        
+        {/* Header section */}
+        <div className="flex flex-col items-center text-center">
+          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
+            <LogIn className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Welcome Back
+          </h2>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Sign in to your digital marketplace account
+          </p>
         </div>
 
+        {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm text-center">
-            {error}
+          <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           </div>
         )}
 
-        <form action={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-5 w-5 text-slate-500" />
+        {/* Form Action binds directly to our async client handler */}
+        <form action={handleLogin} className="space-y-6">
+          <div className="space-y-4">
+            
+            {/* Email Field */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Email address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  disabled={isLoading}
+                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50"
+                  placeholder="you@example.com"
+                />
               </div>
-              <input
-                type="email"
-                name="email"
-                required
-                disabled={isPending}
-                className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50"
-                placeholder="you@example.com"
-              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-slate-500" />
+            {/* Password Field */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  disabled={isLoading}
+                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50"
+                  placeholder="••••••••"
+                />
               </div>
-              <input
-                type="password"
-                name="password"
-                required
-                disabled={isPending}
-                className="block w-full pl-10 pr-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50"
-                placeholder="••••••••"
-              />
             </div>
+            
           </div>
 
           <button
             type="submit"
-            disabled={isPending}
-            className="w-full flex justify-center items-center gap-2 bg-primary hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+            className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" />
+                Signing in...
+              </>
+            ) : (
+              "Sign in"
+            )}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-slate-400">
-          Don't have an account?{" "}
-          <Link href="/register" className="text-primary hover:text-blue-400 font-medium transition-colors">
-            Register here
-          </Link>
+        <div className="text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Don't have an account?{" "}
+            <Link
+              href="/register"
+              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors"
+            >
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>
