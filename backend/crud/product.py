@@ -5,7 +5,13 @@ from sqlalchemy import func
 from typing import List, Dict, Sequence
 
 from models.product import Product, ProductVariant, ProductKey
-from schemas.product import ProductCreate, ProductUpdate, ProductKeyCreate
+from schemas.product import (
+    ProductCreate, 
+    ProductUpdate, 
+    ProductKeyCreate,
+    ProductVariantCreate,
+    ProductVariantUpdate
+)
 
 # --- EXISTING LOGIC PRESERVED EXACTLY ---
 
@@ -26,7 +32,6 @@ async def get_products(db: AsyncSession, include_inactive: bool = False) -> Sequ
     result = await db.execute(query)
     products = result.scalars().all()
     
-    # Calculate available stock dynamically
     variant_ids = [v.id for p in products for v in p.variants]
     stock_map = await get_available_stock_map(db, variant_ids)
     
@@ -37,7 +42,6 @@ async def get_products(db: AsyncSession, include_inactive: bool = False) -> Sequ
     return products
 
 async def get_product_by_id(db: AsyncSession, product_id: int) -> Product | None:
-    # Public read filters for active products only
     query = select(Product).options(selectinload(Product.variants)).where(
         Product.id == product_id,
         Product.is_active == True
@@ -83,10 +87,7 @@ async def bulk_create_product_keys(db: AsyncSession, keys_data: ProductKeyCreate
     await db.commit()
     return len(db_keys)
 
-# --- NEW LOGIC FOR UPDATE AND DELETE ---
-
 async def get_product_by_id_for_admin(db: AsyncSession, product_id: int) -> Product | None:
-    """Fetch a product by ID regardless of is_active status, for admin operations."""
     query = select(Product).options(selectinload(Product.variants)).where(
         Product.id == product_id
     )
@@ -102,17 +103,14 @@ async def get_product_by_id_for_admin(db: AsyncSession, product_id: int) -> Prod
     return product
 
 async def update_product(db: AsyncSession, db_product: Product, product_in: ProductUpdate) -> Product:
-    """Update allowed fields securely."""
     update_data = product_in.model_dump(exclude_unset=True)
     
     for field, value in update_data.items():
-        # Schema strictly limits what can be passed here, protecting id/vendor_id/created_at
         setattr(db_product, field, value)
         
     await db.commit()
     await db.refresh(db_product)
     
-    # Maintain dynamic stock attribute for the returned Response model
     variant_ids = [v.id for v in db_product.variants]
     stock_map = await get_available_stock_map(db, variant_ids)
     for v in db_product.variants:
@@ -121,8 +119,53 @@ async def update_product(db: AsyncSession, db_product: Product, product_in: Prod
     return db_product
 
 async def soft_delete_product(db: AsyncSession, db_product: Product) -> Product:
-    """Soft delete a product by marking it inactive."""
     db_product.is_active = False
     await db.commit()
     await db.refresh(db_product)
     return db_product
+
+# --- NEW: VARIANT CRUD LOGIC ---
+
+async def get_variant_by_id(db: AsyncSession, variant_id: int) -> ProductVariant | None:
+    """Fetch a variant by ID regardless of is_active status."""
+    query = select(ProductVariant).where(ProductVariant.id == variant_id)
+    result = await db.execute(query)
+    variant = result.scalar_one_or_none()
+    
+    if variant:
+        stock_map = await get_available_stock_map(db, [variant.id])
+        variant.available_stock = stock_map.get(variant.id, 0)
+        
+    return variant
+
+async def create_variant(db: AsyncSession, product_id: int, variant_in: ProductVariantCreate) -> ProductVariant:
+    """Create a new variant safely tied to an existing product."""
+    db_variant = ProductVariant(**variant_in.model_dump(), product_id=product_id)
+    db.add(db_variant)
+    await db.commit()
+    await db.refresh(db_variant)
+    db_variant.available_stock = 0
+    return db_variant
+
+async def update_variant(db: AsyncSession, db_variant: ProductVariant, variant_in: ProductVariantUpdate) -> ProductVariant:
+    """Update variant allowing only whitelisted fields to change."""
+    update_data = variant_in.model_dump(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        setattr(db_variant, field, value)
+        
+    await db.commit()
+    await db.refresh(db_variant)
+    
+    # Maintain dynamic stock relationship
+    stock_map = await get_available_stock_map(db, [db_variant.id])
+    db_variant.available_stock = stock_map.get(db_variant.id, 0)
+    
+    return db_variant
+
+async def soft_delete_variant(db: AsyncSession, db_variant: ProductVariant) -> ProductVariant:
+    """Soft delete variant preserving historical keys and purchase data."""
+    db_variant.is_active = False
+    await db.commit()
+    await db.refresh(db_variant)
+    return db_variant
