@@ -31,3 +31,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise credentials_exception
     
     return user
+
+async def get_current_admin_user(current_user = Depends(get_current_user)):
+    """
+    Dependency to ensure the current authenticated user has admin privileges.
+    """
+    # Assuming your User model has a 'role' attribute (e.g., "user", "admin", "reseller")
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action. Admin rights required."
+        )
+    return current_user
