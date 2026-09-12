@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -258,6 +259,63 @@ async def update_order_status(
         await db.refresh(db_order)
         
         return db_order
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+
+async def expire_pending_orders(db: AsyncSession) -> int:
+    """
+    Releases ProductKeys reserved by orders that have remained in PENDING status 
+    beyond a 15-minute reservation timeout. Sets those orders to CANCELLED/FAILED.
+    Returns the number of orders expired.
+    """
+    try:
+        expiration_threshold = datetime.now(timezone.utc) - timedelta(minutes=15)
+        
+        # 1. Fetch eligible orders that are stale
+        # Use skip_locked=True to safely run concurrently without blocking other operations
+        stmt_orders = (
+            select(Order)
+            .filter(
+                Order.status == "PENDING",
+                Order.payment_status == "PENDING",
+                Order.created_at < expiration_threshold
+            )
+            .with_for_update(skip_locked=True)
+        )
+        result = await db.execute(stmt_orders)
+        expired_orders = result.scalars().all()
+        
+        if not expired_orders:
+            return 0
+            
+        expired_order_ids = [order.id for order in expired_orders]
+        
+        # 2. Fetch and lock the reserved keys for ALL these orders at once
+        stmt_keys = (
+            select(ProductKey)
+            .filter(
+                ProductKey.order_id.in_(expired_order_ids),
+                ProductKey.is_sold == False
+            )
+            .with_for_update()
+        )
+        result_keys = await db.execute(stmt_keys)
+        reserved_keys = result_keys.scalars().all()
+        
+        # 3. Release the keys
+        for key in reserved_keys:
+            key.order_id = None
+            
+        # 4. Update order statuses to reflect expiration
+        for order in expired_orders:
+            order.status = "CANCELLED"
+            order.payment_status = "FAILED"
+            
+        await db.commit()
+        return len(expired_orders)
+        
     except Exception as e:
         await db.rollback()
         raise e
