@@ -14,11 +14,19 @@ async function handleProxy(request: NextRequest, { params }: { params: { path: s
     const cookieStore = cookies();
     const token = cookieStore.get("access_token")?.value;
 
-    // Identify if the request is modifying data or hitting protected admin routes
+    // Route Protection Rules
+    const isPublicAuthRoute = targetPath === "auth/login" || targetPath === "auth/register";
+    const isAuthMeRoute = targetPath === "auth/me";
     const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
-    const isProtectedAction = isMutation || targetPath.includes("keys");
+    
+    // Identify if the request requires authentication:
+    // 1. It is explicitly /auth/me (GET)
+    // 2. It is a data mutation AND NOT a public auth route (login/register)
+    // 3. It accesses sensitive key endpoints
+    const isProtectedAction = isAuthMeRoute || (isMutation && !isPublicAuthRoute) || targetPath.includes("keys");
 
     // If the token is missing on protected/mutating requests, return 401 immediately
+    // Public routes like /auth/login and /auth/register bypass this check
     if (isProtectedAction && !token) {
       return NextResponse.json(
         { detail: "Authentication required. Missing access token." },
