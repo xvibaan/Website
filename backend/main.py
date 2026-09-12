@@ -10,7 +10,6 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Strict CORS for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
@@ -19,8 +18,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
-app.include_router(product_router, prefix=f"{settings.API_V1_STR}/products", tags=["Products"])
+app.include_router(
+    auth_router, 
+    prefix=f"{settings.API_V1_STR}/auth", 
+    tags=["Authentication"]
+)
+
+app.include_router(
+    product_router, 
+    prefix=settings.API_V1_STR, 
+    tags=["Products"]
+)
 
 @app.get("/")
 async def root():
