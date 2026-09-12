@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Loader2, UserPlus } from "lucide-react";
@@ -9,9 +9,12 @@ import { registerWithAction } from "@/app/register/actions";
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  // In Next.js 14, useTransition is the recommended way to invoke Server Actions
+  // inside Client Components to properly manage pending states without blocking the UI.
+  const [isPending, startTransition] = useTransition();
 
-  const handleRegister = async (formData: FormData) => {
+  const handleRegister = (formData: FormData) => {
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
 
@@ -21,24 +24,23 @@ export default function RegisterPage() {
       return;
     }
 
-    setIsLoading(true);
     setError(null);
 
-    try {
-      // Call the server action. It will extract email and password natively.
-      const result = await registerWithAction(formData);
+    startTransition(async () => {
+      try {
+        // Call the server action. It will extract email and password natively.
+        const result = await registerWithAction(formData);
 
-      if (result?.error) {
-        setError(result.error);
-      } else if (result?.success) {
-        // Redirect to login page on successful registration
-        router.push("/login");
+        if (result?.error) {
+          setError(result.error);
+        } else if (result?.success) {
+          // Redirect to login page on successful registration
+          router.push("/login");
+        }
+      } catch (err) {
+        setError("An unexpected error occurred. Please try again.");
       }
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
@@ -65,6 +67,7 @@ export default function RegisterPage() {
           </div>
         )}
 
+        {/* Next.js 14 form action handles FormData natively */}
         <form action={handleRegister} className="space-y-6">
           <div className="space-y-4">
             
@@ -85,7 +88,7 @@ export default function RegisterPage() {
                   name="email"
                   type="email"
                   required
-                  disabled={isLoading}
+                  disabled={isPending}
                   className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50"
                   placeholder="you@example.com"
                 />
@@ -109,7 +112,7 @@ export default function RegisterPage() {
                   name="password"
                   type="password"
                   required
-                  disabled={isLoading}
+                  disabled={isPending}
                   className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50"
                   placeholder="••••••••"
                 />
@@ -133,7 +136,7 @@ export default function RegisterPage() {
                   name="confirmPassword"
                   type="password"
                   required
-                  disabled={isLoading}
+                  disabled={isPending}
                   className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50"
                   placeholder="••••••••"
                 />
@@ -144,10 +147,10 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isPending}
             className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? (
+            {isPending ? (
               <>
                 <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" />
                 Creating account...
