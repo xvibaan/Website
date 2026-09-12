@@ -20,7 +20,8 @@ async def get_available_stock_map(db: AsyncSession, variant_ids: List[int]) -> D
         return {}
     query = select(ProductKey.variant_id, func.count(ProductKey.id)).where(
         ProductKey.variant_id.in_(variant_ids),
-        ProductKey.is_sold == False
+        ProductKey.is_sold == False,
+        ProductKey.order_id.is_(None)
     ).group_by(ProductKey.variant_id)
     result = await db.execute(query)
     return dict(result.all())
