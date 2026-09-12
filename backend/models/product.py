@@ -29,7 +29,11 @@ class ProductVariant(Base):
     
     config_name = Column(String, nullable=True)
     duration = Column(String, nullable=False)
-    price = Column(Numeric(12, 2), nullable=False)
+    
+    # Updated pricing architecture
+    selling_price = Column(Numeric(12, 2), nullable=False)
+    vendor_cost = Column(Numeric(12, 2), nullable=True)
+    
     is_active = Column(Boolean, default=True)
 
     # Relationships
@@ -47,7 +51,7 @@ class ProductKey(Base):
     is_sold = Column(Boolean, default=False, index=True)
     sold_to_user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
     
-    # NEW: Order integration
+    # Order integration
     order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
