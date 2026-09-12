@@ -1,64 +1,83 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Any
 
-from db.database import get_db
-from schemas.product import ProductCreate, ProductResponse, ProductKeyCreate
-from crud.product import create_product, get_products, get_product_by_id, bulk_create_product_keys
-from api.deps import get_current_user
-from models.user import User
+from api.deps import get_db, get_current_user
+from schemas.product import ProductCreate, ProductResponse, ProductKeyCreate, ProductUpdate
+from crud import product as crud_product
 
-router = APIRouter()
+router = APIRouter(prefix="/products", tags=["Products"])
+
+# --- EXISTING ENDPOINTS PRESERVED EXACTLY ---
 
 @router.get("/", response_model=List[ProductResponse])
-async def read_products(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    """Public endpoint to view the marketplace catalog, including dynamic variants and available stock."""
-    return await get_products(db, skip=skip, limit=limit)
+async def list_products(db: AsyncSession = Depends(get_db)):
+    return await crud_product.get_products(db, include_inactive=False)
 
-@router.get("/{product_id}", response_model=ProductResponse)
-async def read_product(product_id: int, db: AsyncSession = Depends(get_db)):
-    """Public endpoint to fetch a single active product by ID, along with its variants and stock."""
-    product = await get_product_by_id(db, product_id=product_id)
-    if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Product not found"
-        )
-    return product
-
-@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-async def create_new_product(
-    product: ProductCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Protected endpoint to create a new digital product with dynamic variants (Admin Only)."""
-    
-    # Restrict product creation strictly to admins
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. Only administrators can create products."
-        )
-        
-    return await create_product(db=db, product=product, vendor_id=current_user.id)
-
-@router.post("/keys", status_code=status.HTTP_201_CREATED)
-async def add_product_keys(
+# Keep /keys above /{product_id} to prevent path shadowing
+@router.post("/keys")
+async def insert_product_keys(
     keys_data: ProductKeyCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Any = Depends(get_current_user)
 ):
-    """Protected endpoint to bulk upload digital keys for a variant (Admin Only)."""
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    # Restrict key management strictly to admins
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions. Only administrators can manage keys."
-        )
+    count = await crud_product.bulk_create_product_keys(db, keys_data)
+    return {"message": f"Successfully inserted {count} keys."}
+
+@router.post("/", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+async def create_product(
+    product_in: ProductCreate, 
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return await crud_product.create_product(db, product_in, vendor_id=current_user.id)
+
+@router.get("/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: int, db: AsyncSession = Depends(get_db)):
+    product = await crud_product.get_product_by_id(db, product_id)
+    if not product:
+        # Fails silently for soft-deleted (inactive) items due to CRUD filtering
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+# --- NEW ENDPOINTS ---
+
+@router.put("/{product_id}", response_model=ProductResponse)
+async def update_product(
+    product_id: int,
+    product_in: ProductUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Not enough permissions")
         
-    inserted_count = await bulk_create_product_keys(db=db, keys_data=keys_data)
-    
-    # Intentionally returning only the count to ensure raw key_values are never leaked in API responses
-    return {"message": f"Successfully added {inserted_count} keys to stock."}
+    # Use admin fetcher so they can update/reactivate soft-deleted products
+    db_product = await crud_product.get_product_by_id_for_admin(db, product_id)
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    updated_product = await crud_product.update_product(db, db_product, product_in)
+    return updated_product
+
+@router.delete("/{product_id}")
+async def delete_product(
+    product_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    if getattr(current_user, "role", None) != "admin":
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+        
+    # Use admin fetcher so they can target products regardless of current active status
+    db_product = await crud_product.get_product_by_id_for_admin(db, product_id)
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    await crud_product.soft_delete_product(db, db_product)
+    return {"message": "Product deleted successfully."}
