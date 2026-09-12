@@ -12,10 +12,8 @@ class ProductVariantBase(BaseModel):
     price: Decimal = Field(..., max_digits=12, decimal_places=2)
     is_active: bool = True
 
-
 class ProductVariantCreate(ProductVariantBase):
     pass
-
 
 class ProductVariantResponse(ProductVariantBase):
     id: int
@@ -23,7 +21,6 @@ class ProductVariantResponse(ProductVariantBase):
     available_stock: int = 0
 
     model_config = ConfigDict(from_attributes=True)
-
 
 # -------------------------
 # Product Schemas
@@ -36,10 +33,8 @@ class ProductBase(BaseModel):
     tg_video_url: Optional[str] = None
     is_active: bool = True
 
-
 class ProductCreate(ProductBase):
     variants: List[ProductVariantCreate] = Field(default_factory=list)
-
 
 class ProductResponse(ProductBase):
     id: int
@@ -49,14 +44,12 @@ class ProductResponse(ProductBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 # -------------------------
 # Product Key Schemas
 # -------------------------
 class ProductKeyCreate(BaseModel):
     variant_id: int
     key_values: List[str]
-
 
 class ProductKeyResponse(BaseModel):
     id: int
@@ -67,7 +60,6 @@ class ProductKeyResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 # -------------------------
 # Admin Product Update Schema
 # -------------------------
@@ -77,4 +69,13 @@ class ProductUpdate(BaseModel):
     image_url: Optional[str] = None
     tg_update_url: Optional[str] = None
     tg_video_url: Optional[str] = None
+    is_active: Optional[bool] = None
+
+# -------------------------
+# Admin Product Variant Update Schema
+# -------------------------
+class ProductVariantUpdate(BaseModel):
+    config_name: Optional[str] = None
+    duration: Optional[str] = None
+    price: Optional[Decimal] = Field(default=None, max_digits=12, decimal_places=2)
     is_active: Optional[bool] = None
