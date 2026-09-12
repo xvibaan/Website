@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from api.auth import router as auth_router
 from api.product import router as product_router
+from api import order
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -28,6 +29,11 @@ app.include_router(
     product_router, 
     prefix=settings.API_V1_STR, 
     tags=["Products"]
+)
+
+app.include_router(
+    order.router, 
+    prefix=settings.API_V1_STR
 )
 
 @app.get("/")
