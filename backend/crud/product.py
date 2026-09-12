@@ -13,7 +13,7 @@ from schemas.product import (
     ProductVariantUpdate
 )
 
-# --- EXISTING LOGIC PRESERVED EXACTLY ---
+# --- INVENTORY AND STOCK LOGIC (PRESERVED EXACTLY) ---
 
 async def get_available_stock_map(db: AsyncSession, variant_ids: List[int]) -> Dict[int, int]:
     if not variant_ids:
@@ -25,6 +25,9 @@ async def get_available_stock_map(db: AsyncSession, variant_ids: List[int]) -> D
     ).group_by(ProductKey.variant_id)
     result = await db.execute(query)
     return dict(result.all())
+
+
+# --- PRODUCT CRUD LOGIC ---
 
 async def get_products(db: AsyncSession, include_inactive: bool = False) -> Sequence[Product]:
     query = select(Product).options(selectinload(Product.variants))
@@ -66,6 +69,7 @@ async def create_product(db: AsyncSession, product_in: ProductCreate, vendor_id:
     
     if product_in.variants:
         for variant_in in product_in.variants:
+            # model_dump() seamlessly handles passing selling_price and vendor_cost to the DB model
             db_variant = ProductVariant(**variant_in.model_dump(), product_id=db_product.id)
             db.add(db_variant)
             
@@ -125,7 +129,8 @@ async def soft_delete_product(db: AsyncSession, db_product: Product) -> Product:
     await db.refresh(db_product)
     return db_product
 
-# --- NEW: VARIANT CRUD LOGIC ---
+
+# --- VARIANT CRUD LOGIC ---
 
 async def get_variant_by_id(db: AsyncSession, variant_id: int) -> ProductVariant | None:
     """Fetch a variant by ID regardless of is_active status."""
@@ -152,8 +157,12 @@ async def update_variant(db: AsyncSession, db_variant: ProductVariant, variant_i
     """Update variant allowing only whitelisted fields to change."""
     update_data = variant_in.model_dump(exclude_unset=True)
     
+    # Explicit whitelist enforcing exact fields allowed to be updated by admin, including new pricing structure
+    allowed_fields = {"config_name", "duration", "selling_price", "vendor_cost", "is_active"}
+    
     for field, value in update_data.items():
-        setattr(db_variant, field, value)
+        if field in allowed_fields:
+            setattr(db_variant, field, value)
         
     await db.commit()
     await db.refresh(db_variant)
