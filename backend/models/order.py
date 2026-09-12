@@ -10,7 +10,7 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
     
-    total_amount = Column(Numeric(10, 2), nullable=False)
+    total_amount = Column(Numeric(12, 2), nullable=False)
     status = Column(String, default="PENDING", index=True)          # e.g., PENDING, COMPLETED, CANCELLED
     payment_status = Column(String, default="PENDING", index=True)  # e.g., PENDING, PAID, FAILED, REFUNDED
     
@@ -36,7 +36,10 @@ class OrderItem(Base):
     product_key_id = Column(Integer, ForeignKey("product_keys.id"), unique=True, nullable=True)
 
     # Historical Snapshots
-    price_at_purchase = Column(Numeric(10, 2), nullable=False)
+    price_at_purchase = Column(Numeric(12, 2), nullable=False)
+    vendor_cost_snapshot = Column(Numeric(12, 2), nullable=True)
+    platform_profit_snapshot = Column(Numeric(12, 2), nullable=True)
+    
     product_name_snapshot = Column(String, nullable=False)
     variant_name_snapshot = Column(String, nullable=False)
 
