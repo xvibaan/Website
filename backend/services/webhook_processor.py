@@ -113,15 +113,29 @@ async def process_gateway_webhook(
                         detail="Webhook payment amount mismatch."
                     )
                     
-                # Validate Currency (Fail Closed Constraint)
-                # Because Payment model currently lacks a currency field, we abort securely.
-                raise HTTPException(
-                    status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                    detail="System currency validation is not configured. Wallet credit safely aborted."
-                )
+                # Validate Currency presence
+                if not payment.currency:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Payment record lacks a configured currency. Cannot safely process."
+                    )
+                if not event.currency:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Webhook event lacks currency information."
+                    )
+                    
+                # Validate Currency match exactly
+                normalized_payment_currency = str(payment.currency).strip().upper()
+                normalized_event_currency = str(event.currency).strip().upper()
                 
-                # Execute core Wallet Credit Service 
-                # (Unreachable due to the 501 above, structurally placed for future activation)
+                if normalized_payment_currency != normalized_event_currency:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Webhook currency mismatch."
+                    )
+                
+                # Execute core Wallet Credit Service securely
                 await credit_wallet_after_verified_payment(
                     db=db,
                     payment_id=payment.id,
