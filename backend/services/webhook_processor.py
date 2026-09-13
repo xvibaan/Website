@@ -3,6 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from core.config import settings
 from models.payment import Payment
 from services.wallet_recharge import credit_wallet_after_verified_payment
 from services.payment_providers.base import BasePaymentProvider, NormalizedWebhookEvent
@@ -33,14 +34,17 @@ class ProviderRegistry:
 
 def _get_provider_secret(gateway_name: str) -> str:
     """
-    Retrieves the webhook signature secret for the given gateway.
-    Because secrets cannot be hardcoded and the configuration layer is not yet 
-    defined, this safely fails closed to prevent unverified processing.
+    Retrieves the webhook signature secret for the given gateway securely
+    from the structured configuration dictionary. Fails closed.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=f"Webhook secret configuration for '{gateway_name}' is not yet implemented."
-    )
+    secret = settings.get_webhook_secret(gateway_name)
+    if not secret:
+        logger.error(f"Webhook secret configuration missing for gateway: {gateway_name}")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Webhook secret configuration for this provider is not implemented."
+        )
+    return secret
 
 
 async def process_gateway_webhook(
@@ -55,11 +59,13 @@ async def process_gateway_webhook(
     maintains idempotency, and manages the atomic transaction bounds.
     """
     
+    normalized_gateway_name = gateway_name.strip().lower()
+
     # 1. Resolve Provider safely
-    provider = ProviderRegistry.get(gateway_name)
+    provider = ProviderRegistry.get(normalized_gateway_name)
     
     # 2. Retrieve Webhook Secret (Fails closed)
-    secret = _get_provider_secret(gateway_name)
+    secret = _get_provider_secret(normalized_gateway_name)
     
     # 3. Cryptographic Signature Verification
     # CRITICAL: Do NOT parse the JSON/raw_body before this step succeeds.
