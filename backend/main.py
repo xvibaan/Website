@@ -6,6 +6,7 @@ from api.auth import router as auth_router
 from api.product import router as product_router
 from api import order
 from api.payment_method import router as payment_method_router
+from api.wallet_recharge import router as wallet_recharge_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -40,6 +41,11 @@ app.include_router(
 
 app.include_router(
     payment_method_router,
+    prefix=settings.API_V1_STR
+)
+
+app.include_router(
+    wallet_recharge_router,
     prefix=settings.API_V1_STR
 )
 
