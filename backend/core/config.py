@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -15,11 +16,32 @@ class Settings(BaseSettings):
     # Required for the system to process payments safely.
     PAYMENT_CURRENCY: str
 
+    # Controlled, explicitly declared dictionary mapping gateway names to their webhook secrets.
+    # Can be configured in the environment via a JSON string, e.g.:
+    # PAYMENT_WEBHOOK_SECRETS='{"stripe": "whsec_...", "razorpay": "rzp_..."}'
+    PAYMENT_WEBHOOK_SECRETS: dict[str, str] = Field(default_factory=dict)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore"
+        extra="ignore"  # Prevents arbitrary/uncontrolled environment variable ingestion
     )
+
+    def get_webhook_secret(self, gateway_name: str) -> str | None:
+        """
+        Safely retrieves the webhook secret for a given provider from the 
+        explicitly configured dictionary.
+        """
+        if not gateway_name:
+            return None
+            
+        # Normalize to lowercase to match dictionary keys securely
+        normalized_gateway = gateway_name.strip().lower()
+        secret = self.PAYMENT_WEBHOOK_SECRETS.get(normalized_gateway)
+        
+        if secret and isinstance(secret, str) and secret.strip():
+            return secret.strip()
+        return None
 
 settings = Settings()
