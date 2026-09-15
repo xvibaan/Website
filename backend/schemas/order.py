@@ -5,20 +5,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateOrderRequest(BaseModel):
-    """
-    Payload for creating a new order.
-    """
-    variant_id: int = Field(
-        ..., 
-        description="The ID of the product variant to purchase."
+    variant_id: int
+    quantity: int = Field(
+        default=1,
+        ge=1,
+        description="Quantity of product keys to purchase. Must be at least 1."
     )
 
 
 class OrderItemResponse(BaseModel):
-    """
-    Schema representing an individual item within an order.
-    Does not expose the raw product key value.
-    """
     id: int
     variant_id: int
     product_key_id: Optional[int] = None
@@ -30,9 +25,6 @@ class OrderItemResponse(BaseModel):
 
 
 class OrderResponse(BaseModel):
-    """
-    Schema representing a complete order, including its items.
-    """
     id: int
     user_id: int
     total_amount: Decimal
