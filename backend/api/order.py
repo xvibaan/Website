@@ -10,7 +10,7 @@ from crud.order import (
     get_order_by_id
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_order(
