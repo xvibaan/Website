@@ -4,50 +4,21 @@
 
 @layer base {
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary selection:text-white;
+    @apply bg-background text-foreground antialiased selection:bg-primary selection:text-black;
     overflow-x: hidden;
   }
 }
 
 @layer components {
-  /* Animated mesh gradient background */
-  .mesh-bg {
-    background: #030014;
-    background-image:
-      radial-gradient(at 20% 20%, rgba(124, 58, 237, 0.15) 0, transparent 50%),
-      radial-gradient(at 80% 10%, rgba(6, 182, 212, 0.12) 0, transparent 50%),
-      radial-gradient(at 50% 80%, rgba(244, 63, 94, 0.08) 0, transparent 50%),
-      radial-gradient(at 90% 80%, rgba(124, 58, 237, 0.1) 0, transparent 50%);
-    background-attachment: fixed;
-  }
-
-  /* Core 3D glass card */
+  /* Core Cyberpunk Glass Card */
   .glass-card {
-    @apply relative backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500;
-    background: rgba(15, 23, 42, 0.5);
-    border-color: rgba(255, 255, 255, 0.08);
+    @apply relative backdrop-blur-md border rounded-xl transition-all duration-300;
+    background: rgba(10, 10, 10, 0.85);
+    border-color: rgba(0, 255, 255, 0.2);
   }
   .glass-card:hover {
-    border-color: rgba(124, 58, 237, 0.3);
-    box-shadow:
-      0 25px 50px -12px rgba(0, 0, 0, 0.5),
-      0 0 30px -5px rgba(124, 58, 237, 0.15);
-    transform: translateY(-2px);
-  }
-
-  /* 3D perspective container */
-  .perspective-container {
-    perspective: 1200px;
-    transform-style: preserve-3d;
-  }
-
-  /* 3D tilt card */
-  .tilt-card {
-    @apply transition-transform duration-500 ease-out;
-    transform-style: preserve-3d;
-  }
-  .tilt-card:hover {
-    transform: rotateX(2deg) rotateY(-2deg) scale(1.02);
+    border-color: rgba(0, 255, 255, 0.6);
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.15);
   }
 
   /* Glowing border effect */
@@ -56,104 +27,80 @@
   }
   .glow-border::before {
     content: "";
-    @apply absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-500;
-    background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(6, 182, 212, 0.5), rgba(244, 63, 94, 0.3));
+    @apply absolute -inset-px rounded-xl opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, #00ffff, transparent 60%);
     z-index: -1;
-    filter: blur(12px);
+    filter: blur(8px);
   }
   .glow-border:hover::before {
     @apply opacity-100;
   }
 
-  /* Shimmer text effect */
-  .shimmer-text {
-    background: linear-gradient(
-      110deg,
-      #7c3aed 0%,
-      #06b6d4 30%,
-      #f43f5e 50%,
-      #06b6d4 70%,
-      #7c3aed 100%
-    );
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: shimmer 3s linear infinite;
+  /* Cyberpunk Input */
+  .cyber-input {
+    @apply w-full px-4 py-3 rounded-md border transition-all duration-300 outline-none;
+    background: rgba(0, 0, 0, 0.6);
+    border-color: rgba(0, 255, 255, 0.3);
+    color: #ffffff;
+    font-family: monospace;
+  }
+  .cyber-input::placeholder {
+    color: rgba(0, 255, 255, 0.4);
+  }
+  .cyber-input:focus {
+    border-color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
   }
 
-  /* Floating orb */
-  .orb {
-    @apply absolute rounded-full blur-3xl opacity-30 pointer-events-none;
+  /* Cyberpunk Button */
+  .cyber-btn {
+    @apply relative px-6 py-3 rounded-md font-bold uppercase tracking-widest transition-all duration-300 overflow-hidden text-black text-sm;
+    background: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
   }
-
-  /* Grid pattern overlay */
-  .grid-pattern {
-    background-image: linear-gradient(rgba(124, 58, 237, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(124, 58, 237, 0.05) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  /* Glass input */
-  .glass-input {
-    @apply w-full px-4 py-3 rounded-xl border transition-all duration-300 outline-none;
-    background: rgba(15, 23, 42, 0.6);
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #f8fafc;
-  }
-  .glass-input::placeholder {
-    color: rgba(148, 163, 184, 0.6);
-  }
-  .glass-input:focus {
-    border-color: rgba(124, 58, 237, 0.5);
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.15);
-  }
-
-  /* Glass button */
-  .glass-btn {
-    @apply relative px-6 py-3 rounded-xl font-medium transition-all duration-300 overflow-hidden;
-    background: linear-gradient(135deg, rgba(124, 58, 237, 0.8), rgba(109, 40, 217, 0.9));
-    color: white;
-    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
-  }
-  .glass-btn:hover {
+  .cyber-btn:hover {
+    box-shadow: 0 0 25px rgba(0, 255, 255, 0.8);
     transform: translateY(-1px);
-    box-shadow: 0 12px 40px rgba(124, 58, 237, 0.5);
   }
-  .glass-btn:active {
-    transform: translateY(0px);
+  .cyber-btn:active {
+    transform: translateY(1px);
+  }
+  .cyber-btn:disabled {
+    background: #333333;
+    box-shadow: none;
+    color: #666666;
+    cursor: not-allowed;
   }
 
-  /* Google OAuth button */
-  .google-btn {
-    @apply w-full flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-medium transition-all duration-300 border;
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-    color: #e2e8f0;
+  /* Outline variant */
+  .cyber-btn-outline {
+    @apply relative px-6 py-3 rounded-md font-bold uppercase tracking-widest transition-all duration-300 text-primary border border-primary bg-transparent text-sm;
   }
-  .google-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
+  .cyber-btn-outline:hover {
+    background: rgba(0, 255, 255, 0.1);
+    box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2), 0 0 15px rgba(0, 255, 255, 0.4);
   }
 
   /* Status badges */
-  .badge-completed {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
-    background: rgba(16, 185, 129, 0.1);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.2);
+  .badge-active {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold tracking-wider uppercase border;
+    background: rgba(0, 255, 255, 0.1);
+    color: #00ffff;
+    border-color: rgba(0, 255, 255, 0.4);
   }
-  .badge-pending {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
-    background: rgba(245, 158, 11, 0.1);
-    color: #fbbf24;
-    border: 1px solid rgba(245, 158, 11, 0.2);
+  .badge-archived {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold tracking-wider uppercase border;
+    background: rgba(255, 0, 60, 0.1);
+    color: #ff003c;
+    border-color: rgba(255, 0, 60, 0.4);
   }
-  .badge-failed {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
-    background: rgba(239, 68, 68, 0.1);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.2);
+  
+  /* Matrix/Particle Overlay helper */
+  .particle-overlay {
+    background-image: 
+      linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-position: center center;
   }
 }

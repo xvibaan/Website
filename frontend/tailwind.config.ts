@@ -10,53 +10,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#030014",
-        foreground: "#f8fafc",
-        primary: "#7c3aed",
-        "primary-hover": "#6d28d9",
-        secondary: "#06b6d4",
-        accent: "#f43f5e",
-        card: "rgba(15, 23, 42, 0.6)",
-        "card-border": "rgba(124, 58, 237, 0.15)",
-        "glass-border": "rgba(255, 255, 255, 0.08)",
+        background: "#000000",
+        foreground: "#ffffff",
+        primary: "#00ffff", // Neon Cyan
+        "primary-hover": "#00e5ff",
+        secondary: "#ff003c", // Cyberpunk Red/Pink for destructive actions
+        accent: "#00ffff",
+        card: "rgba(0, 0, 0, 0.7)",
+        "card-border": "rgba(0, 255, 255, 0.3)",
+        "glass-border": "rgba(0, 255, 255, 0.2)",
+      },
+      boxShadow: {
+        'neon': '0 0 10px rgba(0, 255, 255, 0.5), 0 0 20px rgba(0, 255, 255, 0.3)',
+        'neon-strong': '0 0 15px rgba(0, 255, 255, 0.8), 0 0 30px rgba(0, 255, 255, 0.5)',
       },
       animation: {
         "glow": "glow 2s ease-in-out infinite alternate",
-        "float": "float 6s ease-in-out infinite",
-        "float-delayed": "float 6s ease-in-out 2s infinite",
-        "float-slow": "float 8s ease-in-out 1s infinite",
-        "shimmer": "shimmer 2.5s linear infinite",
         "pulse-glow": "pulse-glow 3s ease-in-out infinite",
-        "grid-fade": "grid-fade 4s ease-in-out infinite alternate",
-        "spin-slow": "spin 12s linear infinite",
+        "glitch": "glitch 1s linear infinite",
       },
       keyframes: {
         glow: {
-          "0%": { boxShadow: "0 0 15px rgba(124, 58, 237, 0.3)" },
-          "100%": { boxShadow: "0 0 30px rgba(124, 58, 237, 0.7), 0 0 60px rgba(124, 58, 237, 0.3)" },
-        },
-        float: {
-          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
-          "33%": { transform: "translateY(-12px) rotate(1deg)" },
-          "66%": { transform: "translateY(6px) rotate(-1deg)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
+          "0%": { boxShadow: "0 0 10px rgba(0, 255, 255, 0.3)" },
+          "100%": { boxShadow: "0 0 20px rgba(0, 255, 255, 0.7), 0 0 40px rgba(0, 255, 255, 0.4)" },
         },
         "pulse-glow": {
-          "0%, 100%": { opacity: "0.4" },
-          "50%": { opacity: "0.8" },
-        },
-        "grid-fade": {
-          "0%": { opacity: "0.3" },
-          "100%": { opacity: "0.6" },
+          "0%, 100%": { opacity: "0.5" },
+          "50%": { opacity: "1" },
         },
       },
-      backgroundImage: {
-        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "shimmer-gradient": "linear-gradient(110deg, transparent 25%, rgba(124, 58, 237, 0.1) 37%, transparent 63%)",
-      },
+      fontFamily: {
+        mono: ['"Fira Code"', 'monospace'], // Suggesting a techy font fallback
+      }
     },
   },
   plugins: [],

@@ -1,25 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShoppingCart, CheckCircle, Package } from "lucide-react";
-import { motion } from "framer-motion";
-import { api } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
-
-export interface ProductVariant {
-  id: number;
-  config_name: string | null;
-  duration: string;
-  selling_price: number;
-  available_keys?: number;
-}
+import { ShoppingCart, Video, MessageSquare, AlertTriangle } from "lucide-react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 export interface Product {
-  id: number;
+  id: string | number;
   title: string;
-  description: string;
-  image_url: string | null;
-  variants: ProductVariant[];
+  basePrice: number;
+  margin: number;
+  features: string[];
+  setupLink: string;
+  feedbackLink: string;
+  isArchived: boolean;
 }
 
 interface ProductCardProps {
@@ -27,128 +20,145 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { user } = useAuth();
-  const [selectedVariantId, setSelectedVariantId] = useState<number>(
-    product.variants.length > 0 ? product.variants[0].id : 0
-  );
   const [isBuying, setIsBuying] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
+  // Framer motion 3D effect values
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 20 });
+  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 20 });
+
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["15deg", "-15deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-15deg", "15deg"]);
+
+  const finalPrice = product.basePrice + product.margin;
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const xPct = mouseX / width - 0.5;
+    const yPct = mouseY / height - 0.5;
+    x.set(xPct);
+    y.set(yPct);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
 
   const handleBuy = async () => {
-    if (!user) { setError("Please log in to purchase."); return; }
-    if (!selectedVariant) return;
-
     setIsBuying(true);
-    setError(null);
     setPurchaseSuccess(false);
 
-    try {
-      await api.post("/v1/orders/", { variant_id: selectedVariant.id, quantity: 1 });
+    // Simulate purchase
+    setTimeout(() => {
       setPurchaseSuccess(true);
-      setTimeout(() => setPurchaseSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || "Failed to complete purchase.");
-    } finally {
       setIsBuying(false);
-    }
+      setTimeout(() => setPurchaseSuccess(false), 3000);
+      alert(`Purchase simulation successful for ${product.title}`);
+    }, 1500);
   };
 
   return (
-    <div className="glass-card tilt-card glow-border p-6 flex flex-col group">
-      <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-500"
-          style={{ background: "rgba(124, 58, 237, 0.1)" }}>
-          {product.image_url ? (
-            <img src={product.image_url} alt={product.title} className="w-8 h-8 object-contain" />
+    <div style={{ perspective: "1000px" }} className="h-full">
+      <motion.div
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+        className="glass-card glow-border p-6 flex flex-col group h-full relative"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4" style={{ transform: "translateZ(30px)" }}>
+          <h3 className="text-xl font-bold text-white font-mono uppercase tracking-wider group-hover:text-primary transition-colors">
+            {product.title}
+          </h3>
+          {product.isArchived ? (
+            <span className="badge-archived flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> ARCHIVED
+            </span>
           ) : (
-            <Package className="w-6 h-6 text-primary" />
+            <span className="badge-active">ACTIVE</span>
           )}
         </div>
-        {selectedVariant && (
-          <div className="text-right">
-            <p className="text-2xl font-bold text-white">
-              ${Number(selectedVariant.selling_price).toFixed(2)}
-            </p>
+
+        {/* Pricing */}
+        <div className="mb-4" style={{ transform: "translateZ(40px)" }}>
+          <div className="flex items-end gap-1">
+            <span className="text-sm text-primary font-mono">₹</span>
+            <span className="text-3xl font-bold text-white shadow-neon drop-shadow-md">
+              {finalPrice.toFixed(2)}
+            </span>
           </div>
-        )}
-      </div>
+        </div>
 
-      <h3 className="text-xl font-semibold text-white mb-2">{product.title}</h3>
-      <p className="text-slate-400 text-sm line-clamp-2 mb-6 flex-1">
-        {product.description || "Premium digital product ready for instant delivery."}
-      </p>
-
-      {product.variants.length > 0 ? (
-        <div className="space-y-4 mt-auto">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-              Select Variant
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {product.variants.map((variant) => (
-                <button
-                  key={variant.id}
-                  onClick={() => setSelectedVariantId(variant.id)}
-                  className={`px-3 py-2 text-sm rounded-lg border transition-all duration-300 ${
-                    selectedVariantId === variant.id
-                      ? "border-primary text-white shadow-lg shadow-primary/10"
-                      : "text-slate-400 hover:text-white hover:border-slate-600"
-                  }`}
-                  style={{
-                    background: selectedVariantId === variant.id ? "rgba(124, 58, 237, 0.15)" : "rgba(15, 23, 42, 0.5)",
-                    borderColor: selectedVariantId === variant.id ? undefined : "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  {variant.config_name || variant.duration}
-                </button>
+        {/* Features List */}
+        <div className="flex-1 mb-6" style={{ transform: "translateZ(20px)" }}>
+          {product.features && product.features.length > 0 ? (
+            <ul className="space-y-2">
+              {product.features.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm text-gray-300 font-mono">
+                  <span className="text-primary mt-0.5">›</span>
+                  <span>{feature}</span>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          ) : (
+            <p className="text-xs text-gray-600 font-mono italic">No module data provided.</p>
+          )}
+        </div>
 
-          <div className="pt-2">
-            {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+        {/* External Links */}
+        <div className="grid grid-cols-2 gap-3 mb-4" style={{ transform: "translateZ(30px)" }}>
+          <a
+            href={product.setupLink || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cyber-btn-outline !py-2 !px-2 flex flex-col items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-white"
+          >
+            <Video className="w-4 h-4" />
+            <span>CHECK VIDEO /<br />UPDATE FILE</span>
+          </a>
 
-            <motion.button
-              onClick={handleBuy}
-              disabled={isBuying || purchaseSuccess || (selectedVariant?.available_keys === 0)}
-              whileHover={!isBuying && !purchaseSuccess && selectedVariant?.available_keys !== 0 ? { y: -1 } : {}}
-              whileTap={!isBuying && !purchaseSuccess && selectedVariant?.available_keys !== 0 ? { scale: 0.98 } : {}}
-              className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-300 ${
-                purchaseSuccess
-                  ? "text-emerald-400 border border-emerald-500/30"
-                  : selectedVariant?.available_keys === 0
-                  ? "text-slate-500 cursor-not-allowed"
-                  : "glass-btn !w-full"
-              }`}
-              style={
-                purchaseSuccess ? { background: "rgba(16, 185, 129, 0.1)" }
-                : selectedVariant?.available_keys === 0 ? { background: "rgba(15, 23, 42, 0.5)" }
-                : {}
-              }
-            >
-              {isBuying ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : purchaseSuccess ? (
-                <><CheckCircle className="w-5 h-5" /> Purchased!</>
-              ) : (
-                <><ShoppingCart className="w-5 h-5" /> {selectedVariant?.available_keys === 0 ? "Out of Stock" : "Instant Buy"}</>
-              )}
-            </motion.button>
-            {selectedVariant?.available_keys !== undefined && (
-              <p className="text-center text-xs text-slate-500 mt-2">
-                {selectedVariant.available_keys > 0 ? `${selectedVariant.available_keys} in stock` : "Sold out"}
-              </p>
+          <a
+            href={product.feedbackLink || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cyber-btn-outline !py-2 !px-2 flex flex-col items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-white"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>CHECK<br />FEEDBACK</span>
+          </a>
+        </div>
+
+        {/* Purchase */}
+        <div className="pt-2" style={{ transform: "translateZ(40px)" }}>
+          <button
+            onClick={handleBuy}
+            disabled={isBuying || purchaseSuccess || product.isArchived}
+            className={`w-full py-3 px-4 rounded font-mono text-sm tracking-wider flex items-center justify-center gap-2 transition-all duration-300 ${
+              purchaseSuccess
+                ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                : product.isArchived
+                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
+                : "cyber-btn"
+            }`}
+          >
+            {isBuying ? (
+              <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> EXECUTING...</>
+            ) : purchaseSuccess ? (
+              <>GRANTED</>
+            ) : (
+              <><ShoppingCart className="w-4 h-4" /> PURCHASE KEY</>
             )}
-          </div>
+          </button>
         </div>
-      ) : (
-        <div className="mt-auto pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <p className="text-slate-500 text-sm text-center">No variants available</p>
-        </div>
-      )}
+      </motion.div>
     </div>
   );
 }
