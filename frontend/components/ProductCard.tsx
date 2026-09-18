@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ShoppingCart, CheckCircle, Package } from "lucide-react";
+import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -37,22 +38,15 @@ export default function ProductCard({ product }: ProductCardProps) {
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
 
   const handleBuy = async () => {
-    if (!user) {
-      setError("Please log in to purchase.");
-      return;
-    }
-    
+    if (!user) { setError("Please log in to purchase."); return; }
     if (!selectedVariant) return;
-    
+
     setIsBuying(true);
     setError(null);
     setPurchaseSuccess(false);
 
     try {
-      await api.post("/v1/orders/", {
-        variant_id: selectedVariant.id,
-        quantity: 1,
-      });
+      await api.post("/v1/orders/", { variant_id: selectedVariant.id, quantity: 1 });
       setPurchaseSuccess(true);
       setTimeout(() => setPurchaseSuccess(false), 3000);
     } catch (err: any) {
@@ -63,9 +57,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="glass-card p-6 flex flex-col hover:border-primary/50 group">
+    <div className="glass-card tilt-card glow-border p-6 flex flex-col group">
       <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl bg-slate-800/80 flex items-center justify-center flex-shrink-0 group-hover:animate-glow transition-all">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-500"
+          style={{ background: "rgba(124, 58, 237, 0.1)" }}>
           {product.image_url ? (
             <img src={product.image_url} alt={product.title} className="w-8 h-8 object-contain" />
           ) : (
@@ -97,11 +92,15 @@ export default function ProductCard({ product }: ProductCardProps) {
                 <button
                   key={variant.id}
                   onClick={() => setSelectedVariantId(variant.id)}
-                  className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                  className={`px-3 py-2 text-sm rounded-lg border transition-all duration-300 ${
                     selectedVariantId === variant.id
-                      ? "bg-primary/20 border-primary text-white"
-                      : "bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500"
+                      ? "border-primary text-white shadow-lg shadow-primary/10"
+                      : "text-slate-400 hover:text-white hover:border-slate-600"
                   }`}
+                  style={{
+                    background: selectedVariantId === variant.id ? "rgba(124, 58, 237, 0.15)" : "rgba(15, 23, 42, 0.5)",
+                    borderColor: selectedVariantId === variant.id ? undefined : "rgba(255,255,255,0.08)",
+                  }}
                 >
                   {variant.config_name || variant.duration}
                 </button>
@@ -111,42 +110,42 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           <div className="pt-2">
             {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
-            
-            <button
+
+            <motion.button
               onClick={handleBuy}
               disabled={isBuying || purchaseSuccess || (selectedVariant?.available_keys === 0)}
-              className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
+              whileHover={!isBuying && !purchaseSuccess && selectedVariant?.available_keys !== 0 ? { y: -1 } : {}}
+              whileTap={!isBuying && !purchaseSuccess && selectedVariant?.available_keys !== 0 ? { scale: 0.98 } : {}}
+              className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-300 ${
                 purchaseSuccess
-                  ? "bg-green-500/20 text-green-400 border border-green-500/50"
+                  ? "text-emerald-400 border border-emerald-500/30"
                   : selectedVariant?.available_keys === 0
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-primary hover:bg-primary-hover text-white hover:shadow-lg hover:shadow-primary/20"
+                  ? "text-slate-500 cursor-not-allowed"
+                  : "glass-btn !w-full"
               }`}
+              style={
+                purchaseSuccess ? { background: "rgba(16, 185, 129, 0.1)" }
+                : selectedVariant?.available_keys === 0 ? { background: "rgba(15, 23, 42, 0.5)" }
+                : {}
+              }
             >
               {isBuying ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : purchaseSuccess ? (
-                <>
-                  <CheckCircle className="w-5 h-5" /> Purchased!
-                </>
+                <><CheckCircle className="w-5 h-5" /> Purchased!</>
               ) : (
-                <>
-                  <ShoppingCart className="w-5 h-5" />
-                  {selectedVariant?.available_keys === 0 ? "Out of Stock" : "Instant Buy"}
-                </>
+                <><ShoppingCart className="w-5 h-5" /> {selectedVariant?.available_keys === 0 ? "Out of Stock" : "Instant Buy"}</>
               )}
-            </button>
+            </motion.button>
             {selectedVariant?.available_keys !== undefined && (
               <p className="text-center text-xs text-slate-500 mt-2">
-                {selectedVariant.available_keys > 0 
-                  ? `${selectedVariant.available_keys} in stock` 
-                  : "Sold out"}
+                {selectedVariant.available_keys > 0 ? `${selectedVariant.available_keys} in stock` : "Sold out"}
               </p>
             )}
           </div>
         </div>
       ) : (
-        <div className="mt-auto pt-4 border-t border-slate-800">
+        <div className="mt-auto pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           <p className="text-slate-500 text-sm text-center">No variants available</p>
         </div>
       )}

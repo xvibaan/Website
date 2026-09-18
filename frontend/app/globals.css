@@ -5,13 +5,155 @@
 @layer base {
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary selection:text-white;
-    background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-    background-attachment: fixed;
+    overflow-x: hidden;
   }
 }
 
 @layer components {
+  /* Animated mesh gradient background */
+  .mesh-bg {
+    background: #030014;
+    background-image:
+      radial-gradient(at 20% 20%, rgba(124, 58, 237, 0.15) 0, transparent 50%),
+      radial-gradient(at 80% 10%, rgba(6, 182, 212, 0.12) 0, transparent 50%),
+      radial-gradient(at 50% 80%, rgba(244, 63, 94, 0.08) 0, transparent 50%),
+      radial-gradient(at 90% 80%, rgba(124, 58, 237, 0.1) 0, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Core 3D glass card */
   .glass-card {
-    @apply bg-card backdrop-blur-md border border-card-border rounded-2xl shadow-xl transition-all duration-300;
+    @apply relative backdrop-blur-xl border rounded-2xl shadow-2xl transition-all duration-500;
+    background: rgba(15, 23, 42, 0.5);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .glass-card:hover {
+    border-color: rgba(124, 58, 237, 0.3);
+    box-shadow:
+      0 25px 50px -12px rgba(0, 0, 0, 0.5),
+      0 0 30px -5px rgba(124, 58, 237, 0.15);
+    transform: translateY(-2px);
+  }
+
+  /* 3D perspective container */
+  .perspective-container {
+    perspective: 1200px;
+    transform-style: preserve-3d;
+  }
+
+  /* 3D tilt card */
+  .tilt-card {
+    @apply transition-transform duration-500 ease-out;
+    transform-style: preserve-3d;
+  }
+  .tilt-card:hover {
+    transform: rotateX(2deg) rotateY(-2deg) scale(1.02);
+  }
+
+  /* Glowing border effect */
+  .glow-border {
+    @apply relative;
+  }
+  .glow-border::before {
+    content: "";
+    @apply absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-500;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(6, 182, 212, 0.5), rgba(244, 63, 94, 0.3));
+    z-index: -1;
+    filter: blur(12px);
+  }
+  .glow-border:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Shimmer text effect */
+  .shimmer-text {
+    background: linear-gradient(
+      110deg,
+      #7c3aed 0%,
+      #06b6d4 30%,
+      #f43f5e 50%,
+      #06b6d4 70%,
+      #7c3aed 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 3s linear infinite;
+  }
+
+  /* Floating orb */
+  .orb {
+    @apply absolute rounded-full blur-3xl opacity-30 pointer-events-none;
+  }
+
+  /* Grid pattern overlay */
+  .grid-pattern {
+    background-image: linear-gradient(rgba(124, 58, 237, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 58, 237, 0.05) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Glass input */
+  .glass-input {
+    @apply w-full px-4 py-3 rounded-xl border transition-all duration-300 outline-none;
+    background: rgba(15, 23, 42, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+  }
+  .glass-input::placeholder {
+    color: rgba(148, 163, 184, 0.6);
+  }
+  .glass-input:focus {
+    border-color: rgba(124, 58, 237, 0.5);
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.15);
+  }
+
+  /* Glass button */
+  .glass-btn {
+    @apply relative px-6 py-3 rounded-xl font-medium transition-all duration-300 overflow-hidden;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.8), rgba(109, 40, 217, 0.9));
+    color: white;
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.3);
+  }
+  .glass-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 40px rgba(124, 58, 237, 0.5);
+  }
+  .glass-btn:active {
+    transform: translateY(0px);
+  }
+
+  /* Google OAuth button */
+  .google-btn {
+    @apply w-full flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-medium transition-all duration-300 border;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+  }
+  .google-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
+  /* Status badges */
+  .badge-completed {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+  .badge-pending {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+  }
+  .badge-failed {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
   }
 }
