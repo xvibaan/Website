@@ -7,6 +7,9 @@ import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 export interface Product {
   id: string | number;
   title: string;
+  gameName?: string;
+  deviceType?: string;
+  cheatStatus?: string;
   basePrice: number;
   margin: number;
   features: string[];
@@ -75,15 +78,32 @@ export default function ProductCard({ product }: ProductCardProps) {
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4" style={{ transform: "translateZ(30px)" }}>
-          <h3 className="text-xl font-bold text-white font-mono uppercase tracking-wider group-hover:text-primary transition-colors">
-            {product.title}
-          </h3>
+          <div>
+            <h3 className="text-xl font-bold text-white font-mono uppercase tracking-wider group-hover:text-primary transition-colors">
+              {product.title}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              {product.gameName && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">{product.gameName}</span>}
+              {product.deviceType && <span className="text-[10px] bg-secondary/10 text-secondary px-1.5 py-0.5 rounded border border-secondary/20">{product.deviceType}</span>}
+            </div>
+          </div>
+          
           {product.isArchived ? (
             <span className="badge-archived flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" /> ARCHIVED
             </span>
           ) : (
-            <span className="badge-active">ACTIVE</span>
+            <span className={`badge-active flex items-center gap-1 ${
+              product.cheatStatus === 'UPDATING' ? '!bg-yellow-500/10 !text-yellow-500 !border-yellow-500/40' : 
+              product.cheatStatus === 'RISK' ? '!bg-red-500/10 !text-red-500 !border-red-500/40' : 
+              '!bg-green-500/10 !text-green-500 !border-green-500/40'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                product.cheatStatus === 'UPDATING' ? 'bg-yellow-500' : 
+                product.cheatStatus === 'RISK' ? 'bg-red-500' : 'bg-green-500'
+              }`} />
+              {product.cheatStatus || 'UNDETECTED'}
+            </span>
           )}
         </div>
 

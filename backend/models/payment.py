@@ -17,6 +17,7 @@ class Payment(Base):
     gateway = Column(String, nullable=True)
     gateway_order_id = Column(String, nullable=True, index=True)
     gateway_payment_id = Column(String, nullable=True, index=True)
+    utr = Column(String, nullable=True, index=True) # Unified Transaction Reference for UPI
     idempotency_key = Column(String, unique=True, index=True, nullable=True)
     failure_reason = Column(String, nullable=True)
     

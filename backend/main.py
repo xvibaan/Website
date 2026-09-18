@@ -26,6 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from api.admin import router as admin_router
+from api.payment_verify import router as payment_verify_router
+
 # Register routers
 app.include_router(
     auth_router,
@@ -36,6 +39,8 @@ app.include_router(product_router, prefix=settings.API_V1_STR)
 app.include_router(order.router, prefix=settings.API_V1_STR)
 app.include_router(payment_method_router, prefix=settings.API_V1_STR)
 app.include_router(wallet_recharge_router, prefix=settings.API_V1_STR)
+app.include_router(payment_verify_router, prefix=f"{settings.API_V1_STR}/payment")
+app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin"])
 
 # Register the webhook router (No authentication dependencies added here)
 app.include_router(

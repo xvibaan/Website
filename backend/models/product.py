@@ -12,8 +12,15 @@ class Product(Base):
     title = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
     image_url = Column(String, nullable=True)
-    tg_update_url = Column(String, nullable=True)
-    tg_video_url = Column(String, nullable=True)
+    
+    # New Fields for Storefront Filters
+    game_name = Column(String, index=True, nullable=True) # e.g. FreeFire, Carrom Pool
+    device_type = Column(String, index=True, nullable=True) # e.g. Root, Non-Root
+    cheat_status = Column(String, default="UNDETECTED", index=True) # UNDETECTED, UPDATING, RISK
+    
+    # Unified links
+    setup_link = Column(String, nullable=True)
+    feedback_link = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
