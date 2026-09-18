@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Code2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Code2, Package, ShieldCheck, Zap } from "lucide-react";
 import ProductCard, { Product } from "@/components/ProductCard";
 import { api } from "@/lib/api";
 
