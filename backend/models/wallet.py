@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -19,6 +19,11 @@ class Wallet(Base):
         server_default=func.now(), 
         onupdate=func.now(), 
         nullable=False
+    )
+
+    # Constraints to prevent double spend
+    __table_args__ = (
+        CheckConstraint('balance >= 0', name='check_wallet_balance_positive'),
     )
 
     # Relationships

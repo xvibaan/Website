@@ -14,6 +14,8 @@ class Order(Base):
     status = Column(String, default="PENDING", index=True)          # e.g., PENDING, COMPLETED, CANCELLED
     payment_status = Column(String, default="PENDING", index=True)  # e.g., PENDING, PAID, FAILED, REFUNDED
     
+    idempotency_key = Column(String, unique=True, index=True, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

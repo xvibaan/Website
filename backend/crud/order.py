@@ -6,6 +6,8 @@ from sqlalchemy.orm import selectinload
 
 from models.order import Order, OrderItem
 from models.product import ProductVariant, ProductKey
+from models.wallet import Wallet
+from models.wallet_transaction import WalletTransaction
 
 async def create_order(db: AsyncSession, user_id: int, variant_id: int) -> Order:
     """
@@ -47,7 +49,7 @@ async def create_order(db: AsyncSession, user_id: int, variant_id: int) -> Order
         # 3. Create the Order container (Status: PENDING)
         db_order = Order(
             user_id=user_id,
-            total_amount=variant.price,
+            total_amount=variant.selling_price,
             status="PENDING",
             payment_status="PENDING"
         )
@@ -62,11 +64,14 @@ async def create_order(db: AsyncSession, user_id: int, variant_id: int) -> Order
         )
         
         # 5. Create the OrderItem
+        platform_profit = variant.selling_price - (variant.vendor_cost or 0)
         db_order_item = OrderItem(
             order_id=db_order.id,
             variant_id=variant.id,
             product_key_id=available_key.id,
-            price_at_purchase=variant.price,
+            price_at_purchase=variant.selling_price,
+            vendor_cost_snapshot=variant.vendor_cost,
+            platform_profit_snapshot=platform_profit,
             product_name_snapshot=variant.product.title,
             variant_name_snapshot=snapshot_variant_name
         )
@@ -315,6 +320,122 @@ async def expire_pending_orders(db: AsyncSession) -> int:
             
         await db.commit()
         return len(expired_orders)
+        
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+
+async def create_wallet_purchase(
+    db: AsyncSession, user_id: int, variant_id: int, quantity: int
+) -> Order:
+    """
+    Atomically deducts funds from the user's wallet and Finalizes the order.
+    Rolls back entirely on insufficient funds or stock.
+    """
+    if quantity != 1:
+        raise ValueError("Bulk quantity wallet purchase is not supported in a single atomic transaction yet.")
+        
+    try:
+        # We handle the entire flow manually inside one transaction
+        # 1. Lock the wallet
+        stmt_wallet = select(Wallet).filter(Wallet.user_id == user_id).with_for_update()
+        result_wallet = await db.execute(stmt_wallet)
+        wallet = result_wallet.scalars().first()
+        
+        if not wallet:
+            raise ValueError("Wallet not found for user.")
+            
+        # 2. Get Product Variant to check price
+        stmt_variant = (
+            select(ProductVariant)
+            .options(selectinload(ProductVariant.product))
+            .filter(ProductVariant.id == variant_id, ProductVariant.is_active == True)
+        )
+        result_variant = await db.execute(stmt_variant)
+        variant = result_variant.scalars().first()
+        
+        if not variant or not variant.product:
+            raise ValueError("Product variant not found or inactive.")
+            
+        total_cost = variant.selling_price
+        
+        # 3. Check Balance
+        if wallet.balance < total_cost:
+            raise ValueError("Insufficient wallet balance.")
+            
+        # 4. Lock an available ProductKey safely
+        stmt_key = (
+            select(ProductKey)
+            .filter(
+                ProductKey.variant_id == variant_id, 
+                ProductKey.is_sold == False,
+                ProductKey.order_id.is_(None)
+            )
+            .with_for_update(skip_locked=True)
+        )
+        result_key = await db.execute(stmt_key)
+        available_key = result_key.scalars().first()
+        
+        if not available_key:
+            raise ValueError("Out of stock: No available keys for this variant.")
+            
+        # 5. Deduct Wallet Balance & Create Transaction
+        wallet.balance -= total_cost
+        
+        wallet_txn = WalletTransaction(
+            wallet_id=wallet.id,
+            amount=-total_cost,
+            transaction_type="DEBIT",
+            status="COMPLETED",
+            reference_type="ORDER"
+        )
+        db.add(wallet_txn)
+        await db.flush() # flush to get wallet_txn.id if needed
+        
+        # 6. Create the Order directly in COMPLETED state
+        db_order = Order(
+            user_id=user_id,
+            total_amount=total_cost,
+            status="COMPLETED",
+            payment_status="PAID"
+        )
+        db.add(db_order)
+        await db.flush() # get db_order.id
+        
+        # 7. Create OrderItem with snapshots
+        snapshot_variant_name = (
+            f"{variant.config_name} - {variant.duration}" 
+            if variant.config_name 
+            else variant.duration
+        )
+        platform_profit = total_cost - (variant.vendor_cost or 0)
+        
+        db_order_item = OrderItem(
+            order_id=db_order.id,
+            variant_id=variant.id,
+            product_key_id=available_key.id,
+            price_at_purchase=total_cost,
+            vendor_cost_snapshot=variant.vendor_cost,
+            platform_profit_snapshot=platform_profit,
+            product_name_snapshot=variant.product.title,
+            variant_name_snapshot=snapshot_variant_name
+        )
+        db.add(db_order_item)
+        
+        # 8. Mark Key as Sold and Assign to User
+        available_key.order_id = db_order.id
+        available_key.is_sold = True
+        available_key.sold_to_user_id = user_id
+        
+        # Reference the order in the wallet txn
+        wallet_txn.reference_id = str(db_order.id)
+        
+        # Commit everything
+        await db.commit()
+        await db.refresh(db_order)
+        
+        return await get_order_by_id(db, db_order.id)
         
     except Exception as e:
         await db.rollback()

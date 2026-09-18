@@ -1,5 +1,5 @@
 from typing import List, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import get_db
@@ -71,7 +71,7 @@ async def delete_variant(
         raise HTTPException(status_code=404, detail="Product variant not found")
         
     await crud.soft_delete_variant(db, db_variant=db_variant)
-    return None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------
@@ -157,4 +157,4 @@ async def delete_product(
         raise HTTPException(status_code=404, detail="Product not found")
         
     await crud.soft_delete_product(db, db_product=db_product)
-    return None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

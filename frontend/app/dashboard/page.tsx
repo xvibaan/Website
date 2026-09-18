@@ -2,15 +2,14 @@
 
 import { useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import WalletWidget from "@/components/WalletWidget";
+import OrderTable from "@/components/OrderTable";
 import { 
   User, 
   Shield, 
   Activity, 
   Calendar, 
-  Wallet, 
-  ShoppingBag, 
   LogOut,
-  Clock
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -104,37 +103,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Placeholders for Future Features */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          {/* Dashboard Features */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
             
-            {/* Wallet Placeholder */}
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-sm border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                <Wallet className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Wallet</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
-                View your current balance, add funds, and review your transaction history.
-              </p>
-              <div className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-not-allowed">
-                <Clock className="w-4 h-4 mr-2" />
-                Coming Soon
-              </div>
+            {/* Left Column: Wallet */}
+            <div className="lg:col-span-1">
+              <WalletWidget />
             </div>
 
-            {/* Purchase History Placeholder */}
-            <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-sm border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                <ShoppingBag className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Purchase History</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-4">
-                Access your purchased digital products, view license keys, and download receipts.
-              </p>
-              <div className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg cursor-not-allowed">
-                <Clock className="w-4 h-4 mr-2" />
-                Coming Soon
-              </div>
+            {/* Right Column: Order History */}
+            <div className="lg:col-span-2">
+              <OrderTable />
             </div>
 
           </div>

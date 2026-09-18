@@ -5,5 +5,13 @@
 @layer base {
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary selection:text-white;
+    background-image: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card backdrop-blur-md border border-card-border rounded-2xl shadow-xl transition-all duration-300;
   }
 }
