@@ -7,3 +7,4 @@ from .payment import Payment
 from .wallet import Wallet
 from .site_settings import SiteSetting
 from .support import SupportTicket, TicketMessage
+from .service_category import ServiceCategory

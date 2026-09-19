@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,9 @@ from models.order import Order, OrderItem
 from models.product import ProductVariant, ProductKey
 from models.wallet import Wallet
 from models.wallet_transaction import WalletTransaction
+from services.vendor_delivery import trigger_vendor_api
+
+logger = logging.getLogger(__name__)
 
 async def create_order(db: AsyncSession, user_id: int, variant_id: int) -> Order:
     """
@@ -143,6 +148,13 @@ async def finalize_order(db: AsyncSession, order_id: int) -> Optional[Order]:
 
         await db.commit()
         await db.refresh(db_order)
+
+        # Fire-and-forget: trigger vendor delivery after successful finalization
+        try:
+            asyncio.create_task(trigger_vendor_api(order_id, db))
+        except Exception as delivery_err:
+            logger.error(f"Failed to schedule vendor delivery for order {order_id}: {delivery_err}")
+
         return db_order
 
     except Exception as e:
@@ -434,7 +446,13 @@ async def create_wallet_purchase(
         # Commit everything
         await db.commit()
         await db.refresh(db_order)
-        
+
+        # Fire-and-forget: trigger vendor delivery after successful wallet purchase
+        try:
+            asyncio.create_task(trigger_vendor_api(db_order.id, db))
+        except Exception as delivery_err:
+            logger.error(f"Failed to schedule vendor delivery for order {db_order.id}: {delivery_err}")
+
         return await get_order_by_id(db, db_order.id)
         
     except Exception as e:

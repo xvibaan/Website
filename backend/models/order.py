@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -15,6 +16,11 @@ class Order(Base):
     payment_status = Column(String, default="PENDING", index=True)  # e.g., PENDING, PAID, FAILED, REFUNDED
     
     idempotency_key = Column(String, unique=True, index=True, nullable=True)
+
+    # ── Auto-Delivery Bridge fields ─────────────────────────────────────────
+    target_id = Column(String, nullable=True, index=True)           # Guild ID or Game User ID
+    delivery_status = Column(String, default="PENDING", index=True) # PENDING, PROCESSING, COMPLETED, FAILED
+    extra_data = Column(JSONB, nullable=True)                       # Flexible payload (e.g. {"glory_added": 500})
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

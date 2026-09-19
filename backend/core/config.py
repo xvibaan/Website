@@ -2,7 +2,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Digital Marketplace API"
+    PROJECT_NAME: str = "Host Market Place"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     
@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     # Must be explicitly provided in the environment.
     # Required for the system to process payments safely.
     PAYMENT_CURRENCY: str
+
+    # Vendor API Integration (Auto-Delivery Bridge)
+    VENDOR_API_URL: str = ""          # e.g., "http://vendor-api:8080/api/deliver"
+    VENDOR_WEBHOOK_SECRET: str = ""   # Shared secret for authenticating vendor webhook callbacks
 
     # Controlled, explicitly declared dictionary mapping gateway names to their webhook secrets.
     # Can be configured in the environment via a JSON string, e.g.:
