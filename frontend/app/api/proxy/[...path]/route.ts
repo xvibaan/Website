@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getToken } from "next-auth/jwt";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -12,7 +13,15 @@ async function handleProxy(request: NextRequest, { params }: { params: { path: s
 
     // Read HttpOnly access_token cookie securely on the server
     const cookieStore = cookies();
-    const token = cookieStore.get("access_token")?.value;
+    let token = cookieStore.get("access_token")?.value;
+
+    // Fallback for Google OAuth users (NextAuth)
+    if (!token) {
+      const nextAuthToken = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET || "host-market-place-nextauth-secret" });
+      if (nextAuthToken?.accessToken) {
+        token = nextAuthToken.accessToken as string;
+      }
+    }
 
     // Route Protection Rules
     const isPublicAuthRoute = targetPath === "auth/login" || targetPath === "auth/register";

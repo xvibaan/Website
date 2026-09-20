@@ -59,6 +59,45 @@ async def login_access_token(
     }
 
 
+import secrets
+import string
+from pydantic import BaseModel, EmailStr
+
+class GoogleAuthSync(BaseModel):
+    email: EmailStr
+    name: str | None = None
+    google_id: str | None = None
+
+@router.post("/google")
+async def google_auth_sync(
+    auth_data: GoogleAuthSync,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Sync Google OAuth login with FastAPI. Returns a standard FastAPI JWT access token.
+    If the user does not exist, an account is automatically created.
+    """
+    user = await get_user_by_email(db, email=auth_data.email)
+    
+    if not user:
+        # Generate a secure random password since Google users don't have one
+        alphabet = string.ascii_letters + string.digits + string.punctuation
+        secure_password = ''.join(secrets.choice(alphabet) for i in range(32))
+        
+        user_in = UserCreate(email=auth_data.email, password=secure_password)
+        user = await create_user(db, user_in)
+        
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        subject=user.email, expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
+
+
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(
     current_user: User = Depends(get_current_user)
