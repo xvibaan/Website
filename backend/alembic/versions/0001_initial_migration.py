@@ -1,4 +1,3 @@
-Exact File Path: backend/alembic/versions/0001_initial_migration.py
 """initial migration
 
 Revision ID: 0001_initial_migration

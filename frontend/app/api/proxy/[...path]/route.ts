@@ -45,7 +45,13 @@ async function handleProxy(request: NextRequest, { params }: { params: { path: s
 
     // Build headers to forward, excluding unsafe hop-by-hop or browser-specific headers
     const headers = new Headers();
-    const excludeHeaders = ["host", "connection", "content-length", "cookie"];
+    const excludeHeaders = [
+      "host",
+      "connection",
+      "content-length",
+      "cookie",
+      "accept-encoding",
+    ];
     
     request.headers.forEach((value, key) => {
       if (!excludeHeaders.includes(key.toLowerCase())) {
@@ -81,8 +87,15 @@ async function handleProxy(request: NextRequest, { params }: { params: { path: s
 
     // Prepare response headers, filtering out hop-by-hop response headers
     const responseHeaders = new Headers();
+    const excludeResponseHeaders = [
+      "transfer-encoding",
+      "connection",
+      "keep-alive",
+      "content-encoding",
+      "content-length",
+    ];
     backendResponse.headers.forEach((value, key) => {
-      if (!["transfer-encoding", "connection", "keep-alive"].includes(key.toLowerCase())) {
+      if (!excludeResponseHeaders.includes(key.toLowerCase())) {
         responseHeaders.set(key, value);
       }
     });

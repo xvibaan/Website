@@ -10,8 +10,7 @@ from core.config import settings
 
 # Import Base and ALL existing models so Alembic can auto-detect metadata (tables)
 from db.database import Base
-from models.user import User
-from models.product import Product
+import models
 
 config = context.config
 

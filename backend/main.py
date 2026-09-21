@@ -19,10 +19,10 @@ from api.payment_method import router as payment_method_router
 from api.wallet_recharge import router as wallet_recharge_router
 from api.webhooks import router as webhooks_router
 from api.admin import router as admin_router
+from api.admin_analytics import router as admin_analytics_router
 from api.payment_verify import router as payment_verify_router
 from api.service_category import router as service_category_router
 from api.vendor_webhook import router as vendor_webhook_router
-
 logger = logging.getLogger(__name__)
 
 
@@ -132,6 +132,7 @@ app.include_router(payment_method_router, prefix=settings.API_V1_STR)
 app.include_router(wallet_recharge_router, prefix=settings.API_V1_STR)
 app.include_router(payment_verify_router, prefix=f"{settings.API_V1_STR}/payment")
 app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin"])
+app.include_router(admin_analytics_router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Analytics"])
 
 # Payment gateway webhooks (signature-verified internally, no auth dependency)
 app.include_router(
