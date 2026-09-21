@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
 import TopHeader from "@/components/TopHeader";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
-  title: "HOST MARKET PLACE — Cyberpunk Marketplace",
+  title: "HOST MARKET PLACE — Premium Cyber-SaaS",
   description: "Premium digital mods, tools, and enhancements.",
 };
 
@@ -19,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen bg-black text-white selection:bg-primary selection:text-black overflow-hidden`}>
+      <body className={`${inter.variable} ${jetbrains.variable} font-sans min-h-screen bg-background text-foreground selection:bg-primary selection:text-black overflow-hidden`}>
         <AuthProvider>
           <div className="flex h-screen w-full">
             {/* Left Sidebar */}

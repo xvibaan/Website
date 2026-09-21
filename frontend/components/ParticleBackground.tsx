@@ -23,22 +23,22 @@ export default function ParticleBackground() {
 
     const initParticles = () => {
       particles = [];
-      const numParticles = Math.floor((canvas.width * canvas.height) / 15000);
+      const numParticles = Math.floor((canvas.width * canvas.height) / 25000);
       for (let i = 0; i < numParticles; i++) {
         particles.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5,
-          size: Math.random() * 2 + 0.5,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          size: Math.random() * 1.5 + 0.5,
         });
       }
     };
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#00ffff";
-      ctx.strokeStyle = "rgba(0, 255, 255, 0.15)";
+      ctx.fillStyle = "rgba(0, 194, 255, 0.15)"; // Soft Primary
+      ctx.strokeStyle = "rgba(0, 194, 255, 0.05)";
 
       // Update positions
       particles.forEach((p) => {
@@ -60,7 +60,7 @@ export default function ParticleBackground() {
           const dy = particles[i].y - particles[j].y;
           const dist = dx * dx + dy * dy;
           
-          if (dist < 15000) {
+          if (dist < 10000) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);

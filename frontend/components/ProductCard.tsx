@@ -3,6 +3,9 @@
 import React, { useState } from "react";
 import { ShoppingCart, Video, MessageSquare, AlertTriangle } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { Button } from "./ui/Button";
+import { Badge } from "./ui/Badge";
+import { Card } from "./ui/Card";
 
 export interface Product {
   id: string | number;
@@ -33,8 +36,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   const mouseXSpring = useSpring(x, { stiffness: 300, damping: 20 });
   const mouseYSpring = useSpring(y, { stiffness: 300, damping: 20 });
 
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["15deg", "-15deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-15deg", "15deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["5deg", "-5deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-5deg", "5deg"]);
 
   const finalPrice = product.basePrice + product.margin;
 
@@ -74,109 +77,103 @@ export default function ProductCard({ product }: ProductCardProps) {
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-        className="glass-card glow-border p-6 flex flex-col group h-full relative"
+        className="rounded-2xl border border-card-border bg-card shadow-sm backdrop-blur-xl p-6 flex flex-col group h-full relative transition-all hover:border-primary/50"
       >
         {/* Header */}
-        <div className="flex items-start justify-between mb-4" style={{ transform: "translateZ(30px)" }}>
+        <div className="flex items-start justify-between mb-4" style={{ transform: "translateZ(20px)" }}>
           <div>
-            <h3 className="text-xl font-bold text-white font-mono uppercase tracking-wider group-hover:text-primary transition-colors">
+            <h3 className="text-xl font-bold text-foreground font-sans tracking-wide group-hover:text-primary transition-colors">
               {product.title}
             </h3>
-            <div className="flex items-center gap-2 mt-1">
-              {product.gameName && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20">{product.gameName}</span>}
-              {product.deviceType && <span className="text-[10px] bg-secondary/10 text-secondary px-1.5 py-0.5 rounded border border-secondary/20">{product.deviceType}</span>}
+            <div className="flex items-center gap-2 mt-2">
+              {product.gameName && <Badge variant="secondary" className="text-[10px] py-0">{product.gameName}</Badge>}
+              {product.deviceType && <Badge variant="outline" className="text-[10px] py-0 text-muted-foreground">{product.deviceType}</Badge>}
             </div>
           </div>
           
           {product.isArchived ? (
-            <span className="badge-archived flex items-center gap-1">
+            <Badge variant="destructive" className="flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" /> ARCHIVED
-            </span>
+            </Badge>
           ) : (
-            <span className={`badge-active flex items-center gap-1 ${
-              product.cheatStatus === 'UPDATING' ? '!bg-yellow-500/10 !text-yellow-500 !border-yellow-500/40' : 
-              product.cheatStatus === 'RISK' ? '!bg-red-500/10 !text-red-500 !border-red-500/40' : 
-              '!bg-green-500/10 !text-green-500 !border-green-500/40'
-            }`}>
+            <Badge 
+              variant={product.cheatStatus === 'UPDATING' ? 'secondary' : product.cheatStatus === 'RISK' ? 'destructive' : 'success'}
+              className="flex items-center gap-1"
+            >
               <span className={`w-2 h-2 rounded-full ${
                 product.cheatStatus === 'UPDATING' ? 'bg-yellow-500' : 
                 product.cheatStatus === 'RISK' ? 'bg-red-500' : 'bg-green-500'
               }`} />
               {product.cheatStatus || 'UNDETECTED'}
-            </span>
+            </Badge>
           )}
         </div>
 
         {/* Pricing */}
-        <div className="mb-4" style={{ transform: "translateZ(40px)" }}>
+        <div className="mb-4" style={{ transform: "translateZ(30px)" }}>
           <div className="flex items-end gap-1">
-            <span className="text-sm text-primary font-mono">₹</span>
-            <span className="text-3xl font-bold text-white shadow-neon drop-shadow-md">
+            <span className="text-sm text-muted-foreground font-sans font-medium mb-1">₹</span>
+            <span className="text-3xl font-extrabold text-foreground drop-shadow-md">
               {finalPrice.toFixed(2)}
             </span>
           </div>
         </div>
 
         {/* Features List */}
-        <div className="flex-1 mb-6" style={{ transform: "translateZ(20px)" }}>
+        <div className="flex-1 mb-6" style={{ transform: "translateZ(10px)" }}>
           {product.features && product.features.length > 0 ? (
             <ul className="space-y-2">
               {product.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-sm text-gray-300 font-mono">
-                  <span className="text-primary mt-0.5">›</span>
+                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground font-sans">
+                  <span className="text-primary mt-0.5 font-bold">✓</span>
                   <span>{feature}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-gray-600 font-mono italic">No module data provided.</p>
+            <p className="text-xs text-muted-foreground/60 font-sans italic">No module data provided.</p>
           )}
         </div>
 
         {/* External Links */}
-        <div className="grid grid-cols-2 gap-3 mb-4" style={{ transform: "translateZ(30px)" }}>
-          <a
-            href={product.setupLink || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cyber-btn-outline !py-2 !px-2 flex flex-col items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-white"
+        <div className="grid grid-cols-2 gap-3 mb-4" style={{ transform: "translateZ(20px)" }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col h-auto py-2 items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-foreground"
+            onClick={() => window.open(product.setupLink || "#", "_blank")}
           >
             <Video className="w-4 h-4" />
-            <span>CHECK VIDEO /<br />UPDATE FILE</span>
-          </a>
+            <span>VIDEO GUIDES</span>
+          </Button>
 
-          <a
-            href={product.feedbackLink || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cyber-btn-outline !py-2 !px-2 flex flex-col items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-white"
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex flex-col h-auto py-2 items-center justify-center gap-1 text-[10px] text-center leading-tight hover:text-foreground"
+            onClick={() => window.open(product.feedbackLink || "#", "_blank")}
           >
             <MessageSquare className="w-4 h-4" />
-            <span>CHECK<br />FEEDBACK</span>
-          </a>
+            <span>FEEDBACK</span>
+          </Button>
         </div>
 
         {/* Purchase */}
-        <div className="pt-2" style={{ transform: "translateZ(40px)" }}>
-          <button
+        <div className="pt-2" style={{ transform: "translateZ(30px)" }}>
+          <Button
             onClick={handleBuy}
             disabled={isBuying || purchaseSuccess || product.isArchived}
-            className={`w-full py-3 px-4 rounded font-mono text-sm tracking-wider flex items-center justify-center gap-2 transition-all duration-300 ${
-              purchaseSuccess
-                ? "bg-green-500/20 text-green-400 border border-green-500/50"
-                : product.isArchived
-                ? "bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed"
-                : "cyber-btn"
-            }`}
+            variant={purchaseSuccess ? "outline" : "primary"}
+            className="w-full text-sm tracking-widest font-bold uppercase py-6"
           >
             {isBuying ? (
-              <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> EXECUTING...</>
+              <><div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin mr-2" /> EXECUTING...</>
             ) : purchaseSuccess ? (
-              <>GRANTED</>
+              <><span className="text-green-500">ACCESS GRANTED</span></>
             ) : (
-              <><ShoppingCart className="w-4 h-4" /> PURCHASE KEY</>
+              <><ShoppingCart className="w-4 h-4 mr-2" /> PURCHASE KEY</>
             )}
-          </button>
+          </Button>
         </div>
       </motion.div>
     </div>
