@@ -1,0 +1,6 @@
+{
+  "name": "Host Market Place",
+  "description": "Digital marketplace for game modifications, tools, and enhancements with wallet and order management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

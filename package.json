@@ -1,0 +1,24 @@
+{
+  "name": "host-market-place-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Host Market Place Monorepo Workspace - Frontend, Admin, and Backend",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:admin": "npm --prefix admin run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:admin": "npm --prefix admin run build",
+    "build:backend": "npm --prefix backend run build",
+    "build": "npm --prefix frontend run build && npm --prefix admin run build && npm --prefix backend run build",
+    "lint": "npm --prefix frontend run lint && npm --prefix admin run lint",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix admin run typecheck && npm --prefix backend run typecheck"
+  },
+  "keywords": [
+    "marketplace",
+    "fastify",
+    "nextjs",
+    "drizzle-orm",
+    "postgresql"
+  ]
+}
