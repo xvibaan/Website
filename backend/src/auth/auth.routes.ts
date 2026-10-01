@@ -87,4 +87,29 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       user,
     });
   });
+
+  /**
+   * DELETE /api/v1/auth/me
+   * Securely closes the authenticated user's account and clears session.
+   */
+  app.delete('/me', { preHandler: [authenticate] }, async (request, reply) => {
+    if (!request.user) {
+      return reply.status(401).send({
+        statusCode: 401,
+        error: 'Unauthorized',
+        message: 'Authentication required',
+      });
+    }
+
+    await authService.deleteAccount(request.user.userId);
+
+    reply.clearCookie(AUTH_COOKIE_NAME, {
+      path: '/',
+    });
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Account has been successfully closed and personal data anonymized.',
+    });
+  });
 };

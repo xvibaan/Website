@@ -24,15 +24,14 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
     if (!key_id || !key_secret || !webhookSecret) {
-      console.warn('Razorpay credentials missing. RazorpayPaymentGateway will fail on use if not configured.');
+      throw new Error('CRITICAL CONFIGURATION ERROR: Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET) are missing.');
     }
 
-    // We initialize it anyway so the hub can register it, but requests will fail if auth is bad
     this.razorpay = new Razorpay({
-      key_id: key_id || 'dummy_key',
-      key_secret: key_secret || 'dummy_secret',
+      key_id,
+      key_secret,
     });
-    this.webhookSecret = webhookSecret || 'dummy_webhook_secret';
+    this.webhookSecret = webhookSecret;
   }
 
   async createPayment(params: CreateGatewayPaymentParams): Promise<PaymentIntentResult> {

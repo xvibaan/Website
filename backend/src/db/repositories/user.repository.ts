@@ -62,6 +62,21 @@ export class UserRepository {
 
     return result[0];
   }
+
+  /**
+   * Update a user record.
+   * Can optionally execute within an existing transaction.
+   */
+  async update(id: string, data: Partial<User>, tx?: DbTransaction): Promise<User | null> {
+    const executor = tx || this.db;
+    const result = await executor
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+
+    return result[0] || null;
+  }
 }
 
 /**

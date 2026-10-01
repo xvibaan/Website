@@ -9,7 +9,12 @@ export interface UserRecord {
   walletBalance?: number;
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://127.0.0.1:4000";
+const isProd = process.env.NODE_ENV === 'production';
+const envUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+if (isProd && !envUrl) {
+  throw new Error('CRITICAL CONFIGURATION ERROR: NEXT_PUBLIC_BACKEND_API_URL is required in production.');
+}
+const BACKEND_URL = envUrl || "http://127.0.0.1:4000";
 
 export async function getCurrentUser(): Promise<UserRecord | null> {
   try {

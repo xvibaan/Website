@@ -2,7 +2,12 @@
 
 import { cookies } from "next/headers";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
+const isProd = process.env.NODE_ENV === 'production';
+const envUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+if (isProd && !envUrl) {
+  throw new Error('CRITICAL CONFIGURATION ERROR: NEXT_PUBLIC_BACKEND_API_URL is required in production.');
+}
+const BACKEND_URL = envUrl || "http://localhost:4000";
 
 export async function loginWithCookie(formData: FormData) {
   try {

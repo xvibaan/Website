@@ -135,6 +135,49 @@ export class AuthService {
       updatedAt: user.updatedAt,
     };
   }
+
+  /**
+   * Securely closes a user account.
+   * - Anonymizes personal data (email).
+   * - Deactivates the account (prevents login).
+   * - Disables the associated wallet to prevent transactions.
+   * - Preserves historical financial records tied to the user ID.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    const { getDb } = await import('../db/client');
+    const { walletRepository } = await import('../db/repositories/wallet.repository');
+    const db = getDb();
+
+    await db.transaction(async (tx) => {
+      const user = await this.userRepo.findById(userId, tx);
+      if (!user) {
+        const error: any = new Error('User not found');
+        error.statusCode = 404;
+        error.name = 'NotFound';
+        throw error;
+      }
+
+      if (!user.isActive && user.email.startsWith('deleted_')) {
+        // Already deleted
+        return;
+      }
+
+      const anonymizedEmail = `deleted_${user.id}@deleted.local`;
+      const anonymizedPassword = '*DELETED*';
+
+      await this.userRepo.update(userId, {
+        email: anonymizedEmail,
+        passwordHash: anonymizedPassword,
+        isActive: false,
+        updatedAt: new Date(),
+      }, tx);
+
+      const wallet = await walletRepository.findByUserId(userId, tx);
+      if (wallet && wallet.status !== 'disabled') {
+        await walletRepository.updateStatus(wallet.id, 'disabled', tx);
+      }
+    });
+  }
 }
 
 export const authService = new AuthService();

@@ -12,7 +12,8 @@
         "db:migrate": "drizzle-kit migrate --config=./drizzle.config.ts",
         "db:migrate:prod": "tsx src/scripts/migrate.ts",
         "bootstrap:admin": "tsx src/scripts/bootstrap-admin.ts",
-        "seed:categories": "tsx src/scripts/seed-categories.ts"
+        "seed:categories": "tsx src/scripts/seed-categories.ts",
+        "test": "echo \"Automated backend tests are currently not implemented.\" && exit 1"
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1141.0",

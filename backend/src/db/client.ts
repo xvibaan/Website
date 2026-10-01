@@ -22,6 +22,17 @@ export function getDbPool(): Pool {
       connectionTimeoutMillis: 5000,
     };
 
+    if (process.env.NODE_ENV === 'production') {
+      const sslMode = process.env.DB_SSL_MODE || 'require';
+      if (sslMode === 'require') {
+        config.ssl = {
+          rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+        };
+      } else if (sslMode !== 'disable') {
+        throw new Error(`CRITICAL CONFIGURATION ERROR: Invalid DB_SSL_MODE in production: ${sslMode}. Expected 'require' or 'disable'.`);
+      }
+    }
+
     pool = new Pool(config);
 
     pool.on('error', (err) => {

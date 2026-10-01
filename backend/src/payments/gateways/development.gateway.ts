@@ -28,7 +28,11 @@ export class DevelopmentPaymentGateway implements IPaymentGateway {
   private secret: string;
 
   constructor(secret?: string) {
-    this.secret = secret || process.env.RAZORPAY_WEBHOOK_SECRET || 'dev-webhook-secret-placeholder';
+    const finalSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!finalSecret) {
+      throw new Error('CRITICAL CONFIGURATION ERROR: Webhook secret is required for DevelopmentPaymentGateway.');
+    }
+    this.secret = finalSecret;
   }
 
   private assertNonProduction(): void {

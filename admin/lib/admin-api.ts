@@ -17,7 +17,16 @@ export interface AdminErrorResponse {
 }
 
 class AdminApiClient {
-  private baseUrl = `${process.env.NEXT_PUBLIC_BACKEND_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000")}/api/v1/admin`;
+  private baseUrl: string;
+
+  constructor() {
+    const isProd = process.env.NODE_ENV === 'production';
+    const envUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+    if (isProd && !envUrl) {
+      throw new Error('CRITICAL CONFIGURATION ERROR: NEXT_PUBLIC_BACKEND_API_URL is required in production.');
+    }
+    this.baseUrl = `${envUrl || "http://localhost:4000"}/api/v1/admin`;
+  }
 
   private async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -162,7 +171,12 @@ class AdminApiClient {
 
   // Backend System Health Check
   async checkHealth(): Promise<{ status: string }> {
-    const backendHost = process.env.NEXT_PUBLIC_BACKEND_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000");
+    const isProd = process.env.NODE_ENV === 'production';
+    const envUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
+    if (isProd && !envUrl) {
+      throw new Error('CRITICAL CONFIGURATION ERROR: NEXT_PUBLIC_BACKEND_API_URL is required in production.');
+    }
+    const backendHost = envUrl || "http://localhost:4000";
     const res = await fetch(`${backendHost}/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
