@@ -1,6 +1,9 @@
 /**
  * Centralized Master Admin API Client
- * Strictly communicates with Fastify Master Backend via `/api/v1/admin/*`
+ *
+ * Routes through the same-origin Next.js API proxy (/api/proxy/admin/...)
+ * so the browser sends the session cookie to the proxy, which forwards it
+ * to the Fastify Master Backend.
  */
 
 export interface AdminApiResponse<T = any> {
@@ -20,12 +23,8 @@ class AdminApiClient {
   private baseUrl: string;
 
   constructor() {
-    const isProd = process.env.NODE_ENV === 'production';
-    const envUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL;
-    if (isProd && !envUrl) {
-      throw new Error('CRITICAL CONFIGURATION ERROR: NEXT_PUBLIC_BACKEND_API_URL is required in production.');
-    }
-    this.baseUrl = `${envUrl || "http://localhost:4000"}/api/v1/admin`;
+    // Route through same-origin proxy — no cross-origin cookie issues
+    this.baseUrl = '/api/proxy/admin';
   }
 
   private async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -46,7 +45,6 @@ class AdminApiClient {
     const res = await fetch(url, {
       ...options,
       headers,
-      credentials: 'include', // Pass session cookies
     });
 
     let data: any;
