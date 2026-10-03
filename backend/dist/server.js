@@ -79,6 +79,7 @@ function buildServer() {
             message: statusCode === 500 && process.env.NODE_ENV === 'production'
                 ? 'Internal server error occurred'
                 : error.message || 'An unexpected error occurred',
+            requestId: request.id,
         });
     });
     // Plugins Registration
@@ -103,12 +104,17 @@ function buildServer() {
         prefix: '/uploads/',
         decorateReply: false,
     });
+    const authSecret = process.env.AUTH_SECRET;
+    if (!authSecret) {
+        throw new Error('CRITICAL CONFIGURATION ERROR: AUTH_SECRET environment variable is required.');
+    }
     app.register(cookie_1.default, {
-        secret: process.env.AUTH_SECRET || 'dev-cookie-secret-placeholder',
+        secret: authSecret,
         parseOptions: {},
     });
     // CORS Configuration
-    const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+    const isProd = process.env.NODE_ENV === 'production';
+    const defaultOrigins = isProd ? [] : ['http://localhost:3000', 'http://localhost:3001'];
     const envOrigins = process.env.CORS_ORIGINS
         ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
         : [];
@@ -173,11 +179,14 @@ function buildServer() {
     // Public Catalog API Routes (Products & Categories)
     app.register(catalog_routes_1.catalogRoutes, { prefix: '/api/v1' });
     // Production Security Headers
-    app.addHook('onRequest', async (_request, reply) => {
+    app.addHook('onRequest', async (request, reply) => {
         reply.header('X-Content-Type-Options', 'nosniff');
         reply.header('X-Frame-Options', 'DENY');
         reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
         reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        if (process.env.NODE_ENV === 'production' && request.protocol === 'https') {
+            reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
     });
     // Sensitive API Cache-Control Hardening
     app.addHook('onSend', async (request, reply) => {

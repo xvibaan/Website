@@ -1,8 +1,10 @@
+import crypto from 'crypto';
 import { UserRepository, userRepository } from '../db/repositories/user.repository';
 import { PasswordService } from './password.service';
 import { RegisterInput, LoginInput } from './auth.validation';
 import { AuthenticatedUserPayload, SafeUser, UserRole } from './auth.types';
 import { createSessionToken } from './session';
+import { GoogleIdentity } from './google-oauth.service';
 
 export interface AuthResult {
   token: string;
@@ -85,6 +87,94 @@ export class AuthService {
       error.statusCode = 401;
       error.name = 'Unauthorized';
       throw error;
+    }
+
+    const userPayload: AuthenticatedUserPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role as UserRole,
+      isActive: user.isActive,
+    };
+
+    const token = createSessionToken(userPayload);
+    const safeUser = this.toSafeUser(user);
+
+    return { token, user: safeUser };
+  }
+
+  /**
+   * Authenticates a verified Google identity.
+   *
+   * Existing user:
+   * - Finds by Google ID first.
+   * - Otherwise finds by verified email and links the Google ID.
+ *
+   * New user:
+   * - Creates a customer account.
+   * - Stores a random unusable password hash because the current schema
+   *   requires password_hash to be non-null.
+   */
+  async loginWithGoogle(identity: GoogleIdentity): Promise<AuthResult> {
+    if (!identity.googleId || !identity.email || !identity.emailVerified) {
+      const error: any = new Error('Invalid Google identity');
+      error.statusCode = 401;
+      error.name = 'Unauthorized';
+      throw error;
+    }
+
+    const normalizedEmail = identity.email.toLowerCase().trim();
+
+    let user = await this.userRepo.findByGoogleId(identity.googleId);
+
+    if (user) {
+      if (!user.isActive) {
+        const error: any = new Error('Account is inactive or suspended');
+        error.statusCode = 403;
+        error.name = 'Forbidden';
+        throw error;
+      }
+
+      // Keep the verified Google email synchronized with the account.
+      if (user.email !== normalizedEmail) {
+        user = (await this.userRepo.update(user.id, {
+          email: normalizedEmail,
+          updatedAt: new Date(),
+        })) || user;
+      }
+    } else {
+      user = await this.userRepo.findByEmail(normalizedEmail);
+
+      if (user) {
+        if (!user.isActive) {
+          const error: any = new Error('Account is inactive or suspended');
+          error.statusCode = 403;
+          error.name = 'Forbidden';
+          throw error;
+        }
+
+        if (user.googleId && user.googleId !== identity.googleId) {
+          const error: any = new Error('This account is already linked to another Google account');
+          error.statusCode = 409;
+          error.name = 'Conflict';
+          throw error;
+        }
+
+        user = (await this.userRepo.update(user.id, {
+          googleId: identity.googleId,
+          updatedAt: new Date(),
+        })) || user;
+      } else {
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const passwordHash = await PasswordService.hash(randomPassword);
+
+        user = await this.userRepo.create({
+          email: normalizedEmail,
+          googleId: identity.googleId,
+          passwordHash,
+          role: 'customer',
+          isActive: true,
+        });
+      }
     }
 
     const userPayload: AuthenticatedUserPayload = {

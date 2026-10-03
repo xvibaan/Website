@@ -19,10 +19,20 @@ export declare class UserRepository {
      */
     findByEmail(email: string, tx?: DbTransaction): Promise<User | null>;
     /**
+     * Find a user by their unique Google account ID.
+     * Can optionally execute within an existing transaction.
+     */
+    findByGoogleId(googleId: string, tx?: DbTransaction): Promise<User | null>;
+    /**
      * Create a new user record.
      * Can optionally execute within an existing transaction.
      */
     create(data: NewUser, tx?: DbTransaction): Promise<User>;
+    /**
+     * Update a user record.
+     * Can optionally execute within an existing transaction.
+     */
+    update(id: string, data: Partial<User>, tx?: DbTransaction): Promise<User | null>;
 }
 /**
  * Export default singleton instance for convenience.

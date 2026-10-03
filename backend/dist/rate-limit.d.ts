@@ -23,13 +23,10 @@ import { FastifyInstance } from 'fastify';
 export declare function registerRateLimiting(app: FastifyInstance): Promise<void>;
 /**
  * Endpoint-specific rate limit overrides.
- * These are applied as Fastify route config objects and are used
- * to tighten limits on abuse-sensitive endpoints beyond the global baseline.
  */
 export declare const rateLimitOverrides: {
     /**
      * Login: 10 attempts per minute per IP.
-     * Protects against credential brute-force attacks.
      */
     readonly login: {
         readonly config: {
@@ -41,7 +38,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Registration: 5 attempts per minute per IP.
-     * Protects against account creation spam / bot registrations.
      */
     readonly register: {
         readonly config: {
@@ -52,8 +48,29 @@ export declare const rateLimitOverrides: {
         };
     };
     /**
+     * Google OAuth authorization start: 10 requests per minute per IP.
+     */
+    readonly googleOAuthStart: {
+        readonly config: {
+            readonly rateLimit: {
+                readonly max: 10;
+                readonly timeWindow: "1 minute";
+            };
+        };
+    };
+    /**
+     * Google OAuth callback: 10 requests per minute per IP.
+     */
+    readonly googleOAuthCallback: {
+        readonly config: {
+            readonly rateLimit: {
+                readonly max: 10;
+                readonly timeWindow: "1 minute";
+            };
+        };
+    };
+    /**
      * Payment creation: 15 per minute per IP.
-     * Customers typically create 1-2 payment intents per session.
      */
     readonly paymentCreate: {
         readonly config: {
@@ -65,7 +82,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Order creation: 20 per minute per IP.
-     * Allows rapid legitimate purchasing while blocking automated order spam.
      */
     readonly orderCreate: {
         readonly config: {
@@ -77,7 +93,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Provider test-connection: 6 per minute per IP.
-     * Prevents upstream provider flooding from admin panel.
      */
     readonly providerTestConnection: {
         readonly config: {
@@ -89,7 +104,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Provider catalog sync: 5 per minute per IP.
-     * Catalog syncs involve upstream API calls and should be throttled.
      */
     readonly providerCatalogSync: {
         readonly config: {
@@ -101,7 +115,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Provider health check: 10 per minute per IP.
-     * More generous than test-connection since health checks are lightweight.
      */
     readonly providerHealthCheck: {
         readonly config: {
@@ -113,7 +126,6 @@ export declare const rateLimitOverrides: {
     };
     /**
      * Reseller API calls: 60 per minute per IP.
-     * Throttles programmatic reseller integrations appropriately.
      */
     readonly resellerApi: {
         readonly config: {

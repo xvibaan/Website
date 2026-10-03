@@ -41,6 +41,19 @@ class UserRepository {
         return result[0] || null;
     }
     /**
+     * Find a user by their unique Google account ID.
+     * Can optionally execute within an existing transaction.
+     */
+    async findByGoogleId(googleId, tx) {
+        const executor = tx || this.db;
+        const result = await executor
+            .select()
+            .from(users_1.users)
+            .where((0, drizzle_orm_1.eq)(users_1.users.googleId, googleId))
+            .limit(1);
+        return result[0] || null;
+    }
+    /**
      * Create a new user record.
      * Can optionally execute within an existing transaction.
      */
@@ -55,6 +68,19 @@ class UserRepository {
             .values(normalizedData)
             .returning();
         return result[0];
+    }
+    /**
+     * Update a user record.
+     * Can optionally execute within an existing transaction.
+     */
+    async update(id, data, tx) {
+        const executor = tx || this.db;
+        const result = await executor
+            .update(users_1.users)
+            .set(data)
+            .where((0, drizzle_orm_1.eq)(users_1.users.id, id))
+            .returning();
+        return result[0] || null;
     }
 }
 exports.UserRepository = UserRepository;

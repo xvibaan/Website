@@ -45,6 +45,21 @@ export class UserRepository {
   }
 
   /**
+   * Find a user by their unique Google account ID.
+   * Can optionally execute within an existing transaction.
+   */
+  async findByGoogleId(googleId: string, tx?: DbTransaction): Promise<User | null> {
+    const executor = tx || this.db;
+    const result = await executor
+      .select()
+      .from(users)
+      .where(eq(users.googleId, googleId))
+      .limit(1);
+
+    return result[0] || null;
+  }
+
+  /**
    * Create a new user record.
    * Can optionally execute within an existing transaction.
    */

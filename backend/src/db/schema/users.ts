@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm';
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
+  googleId: varchar('google_id', { length: 255 }).unique(),
   passwordHash: text('password_hash').notNull(),
   role: varchar('role', { length: 50 }).notNull().default('customer'),
   isActive: boolean('is_active').notNull().default(true),

@@ -20,7 +20,11 @@ class DevelopmentPaymentGateway {
     gatewayId = 'dev-gateway';
     secret;
     constructor(secret) {
-        this.secret = secret || process.env.RAZORPAY_WEBHOOK_SECRET || 'dev-webhook-secret-placeholder';
+        const finalSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET;
+        if (!finalSecret) {
+            throw new Error('CRITICAL CONFIGURATION ERROR: Webhook secret is required for DevelopmentPaymentGateway.');
+        }
+        this.secret = finalSecret;
     }
     assertNonProduction() {
         if (process.env.NODE_ENV === 'production') {

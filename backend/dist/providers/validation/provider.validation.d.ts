@@ -30,9 +30,9 @@ export declare const providerQuerySchema: z.ZodObject<{
     page: z.ZodPipe<z.ZodDefault<z.ZodOptional<z.ZodString>>, z.ZodTransform<number, string>>;
     limit: z.ZodPipe<z.ZodDefault<z.ZodOptional<z.ZodString>>, z.ZodTransform<number, string>>;
     isEnabled: z.ZodPipe<z.ZodOptional<z.ZodEnum<{
-        true: "true";
         false: "false";
-    }>>, z.ZodTransform<boolean | undefined, "true" | "false" | undefined>>;
+        true: "true";
+    }>>, z.ZodTransform<boolean | undefined, "false" | "true" | undefined>>;
     health: z.ZodOptional<z.ZodEnum<{
         UNKNOWN: "UNKNOWN";
         HEALTHY: "HEALTHY";

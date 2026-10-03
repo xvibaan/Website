@@ -12,6 +12,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 exports.users = (0, pg_core_1.pgTable)('users', {
     id: (0, pg_core_1.uuid)('id').defaultRandom().primaryKey(),
     email: (0, pg_core_1.varchar)('email', { length: 255 }).notNull().unique(),
+    googleId: (0, pg_core_1.varchar)('google_id', { length: 255 }).unique(),
     passwordHash: (0, pg_core_1.text)('password_hash').notNull(),
     role: (0, pg_core_1.varchar)('role', { length: 50 }).notNull().default('customer'),
     isActive: (0, pg_core_1.boolean)('is_active').notNull().default(true),
