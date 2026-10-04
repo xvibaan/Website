@@ -30,7 +30,7 @@ export async function generateMetadata(
 
   try {
     // Attempt to fetch product data from the authoritative source
-    const product: any = await api.get(`/products/${params.id}`);
+    const product: any = await api.get(`/api/v1/products/${params.id}`);
 
     if (!product || !product.id) {
       return fallbackMetadata;
@@ -78,7 +78,7 @@ export default async function ProductLayout({
   let product: any = null;
 
   try {
-    product = await api.get(`/products/${params.id}`);
+    product = await api.get(`/api/v1/products/${params.id}`);
   } catch (error) {
     // Silent fail for JSON-LD if product not found
   }
