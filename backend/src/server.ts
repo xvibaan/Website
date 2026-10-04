@@ -17,6 +17,7 @@ import { providerRoutes } from './providers/routes/provider.routes';
 import { providerRegistry } from './providers/registry/ProviderRegistry';
 import { DevelopmentProviderAdapter } from './providers/adapters/development/DevelopmentProviderAdapter';
 import { catalogRoutes } from './catalog/catalog.routes';
+import { contentRoutes } from './content/content.routes';
 import { orderRoutes } from './orders/orders.routes';
 import { settingsAdminService } from './admin/services/settings.service';
 import { orderService } from './orders/order.service';
@@ -198,6 +199,9 @@ export function buildServer(): FastifyInstance {
 
   // Public Catalog API Routes (Products & Categories)
   app.register(catalogRoutes, { prefix: '/api/v1' });
+
+  // Public Marketplace Content API Route (allowlisted content.* settings)
+  app.register(contentRoutes, { prefix: '/api/v1' });
 
   // Production Security Headers
   app.addHook('onRequest', async (request, reply) => {
