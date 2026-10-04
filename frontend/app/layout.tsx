@@ -12,8 +12,27 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
-  title: "Host Market Place",
+  metadataBase: new URL("https://hostmarketplace.store"),
+  title: {
+    default: "Host Market Place",
+    template: "%s | Host Market Place",
+  },
   description: "Digital marketplace for game modifications, tools, and enhancements with wallet and order management.",
+  icons: {
+    icon: "/icon.svg",
+  },
+  openGraph: {
+    title: "Host Market Place",
+    description: "Digital marketplace for game modifications, tools, and enhancements with wallet and order management.",
+    url: "https://hostmarketplace.store",
+    siteName: "Host Market Place",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Host Market Place",
+    description: "Digital marketplace for game modifications, tools, and enhancements with wallet and order management.",
+  },
 };
 
 export const viewport: Viewport = {

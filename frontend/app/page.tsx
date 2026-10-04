@@ -177,9 +177,9 @@ export default function Home() {
             <Sparkles className="w-3.5 h-3.5" />
             Database-Driven Categories
           </div>
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
             {contentSettings?.categoriesHeadline || "Explore Marketplace Categories"}
-          </h2>
+          </h1>
         </div>
 
         {isLoading && storedCategories.length === 0 ? (
