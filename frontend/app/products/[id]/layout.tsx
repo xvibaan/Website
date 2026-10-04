@@ -68,10 +68,63 @@ export async function generateMetadata(
   }
 }
 
-export default function ProductLayout({
+export default async function ProductLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: { id: string };
 }) {
-  return <>{children}</>;
+  let product: any = null;
+
+  try {
+    product = await api.get(`/products/${params.id}`);
+  } catch (error) {
+    // Silent fail for JSON-LD if product not found
+  }
+
+  let jsonLd = null;
+
+  if (product && product.id) {
+    const title = product.name || product.title || "Product Details";
+    const description = product.shortDescription || product.description || "View product details on Host Market Place.";
+    const imageUrl = product.imageUrl || product.image_url;
+    const url = `https://hostmarketplace.store/products/${product.slug || params.id}`;
+    const price = product.sellingPrice ?? product.price ?? product.basePrice ?? null;
+    const currency = product.currency || "INR";
+
+    const isOutOfStock = product.availability === "OUT_OF_STOCK" || product.status === "DISABLED";
+    const availability = isOutOfStock ? "https://schema.org/OutOfStock" : "https://schema.org/InStock";
+
+    jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: title,
+      description: description,
+      url: url,
+      ...(imageUrl && { image: imageUrl }),
+    };
+
+    if (price !== null && price !== undefined) {
+      jsonLd.offers = {
+        "@type": "Offer",
+        price: price.toString(),
+        priceCurrency: currency,
+        availability: availability,
+        url: url,
+      };
+    }
+  }
+
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {children}
+    </>
+  );
 }

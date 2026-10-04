@@ -20,6 +20,31 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "name": "Host Market Place",
+      "url": "https://hostmarketplace.store/",
+      "logo": "https://hostmarketplace.store/icon.svg",
+    },
+    {
+      "@type": "WebSite",
+      "name": "Host Market Place",
+      "url": "https://hostmarketplace.store/",
+    },
+  ],
+};
+
 export default function HomePage() {
-  return <HomeClient />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <HomeClient />
+    </>
+  );
 }
