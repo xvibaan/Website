@@ -1,6 +1,7 @@
 import type { Metadata, ResolvingMetadata } from "next";
 import { api } from "@/lib/api";
 
+export const revalidate = 3600;
 type Props = {
   params: { id: string };
 };
