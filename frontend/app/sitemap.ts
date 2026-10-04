@@ -51,7 +51,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     const res = await fetch(`${backendUrl}/api/v1/products`, {
-      cache: "no-store", // Do not cache build-time failed states
     });
 
     if (!res.ok) {
