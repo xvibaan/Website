@@ -13,7 +13,7 @@ export default function ContactPage() {
     <div className="container mx-auto max-w-4xl py-12 px-4 sm:px-6">
       <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-10 shadow-[0_0_15px_rgba(0,194,255,0.1)]">
         <p className="text-primary font-bold text-center text-sm md:text-base">
-          This policy is a structural placeholder and must be replaced with the marketplace owner's final legal/business policy before production use.
+          This policy is a structural placeholder and must be replaced with the marketplace owner&apos;s final legal/business policy before production use.
         </p>
       </div>
 
