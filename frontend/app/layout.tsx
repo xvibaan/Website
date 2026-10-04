@@ -7,7 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import TopHeader from "@/components/TopHeader";
 import UserGuideModal from "@/components/UserGuideModal";
 import FloatingSupportButton from "@/components/FloatingSupportButton";
-
+import Footer from "@/components/Footer";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
@@ -75,8 +75,11 @@ export default function RootLayout({
               <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 min-w-0">
                 <TopHeader />
 
-                <main className="flex-1 overflow-y-auto relative z-10 p-3 sm:p-6 md:p-8">
-                  {children}
+                <main className="flex-1 overflow-y-auto relative z-10 p-3 sm:p-6 md:p-8 flex flex-col">
+                  <div className="flex-1">
+                    {children}
+                  </div>
+                  <Footer />
                 </main>
               </div>
 
