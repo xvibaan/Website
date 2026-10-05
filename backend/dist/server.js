@@ -22,6 +22,7 @@ const payment_routes_1 = require("./payments/routes/payment.routes");
 const ProviderRegistry_1 = require("./providers/registry/ProviderRegistry");
 const DevelopmentProviderAdapter_1 = require("./providers/adapters/development/DevelopmentProviderAdapter");
 const catalog_routes_1 = require("./catalog/catalog.routes");
+const content_routes_1 = require("./content/content.routes");
 const orders_routes_1 = require("./orders/orders.routes");
 const settings_service_1 = require("./admin/services/settings.service");
 const order_service_1 = require("./orders/order.service");
@@ -79,6 +80,7 @@ function buildServer() {
             message: statusCode === 500 && process.env.NODE_ENV === 'production'
                 ? 'Internal server error occurred'
                 : error.message || 'An unexpected error occurred',
+            requestId: request.id,
         });
     });
     // Plugins Registration
@@ -103,12 +105,17 @@ function buildServer() {
         prefix: '/uploads/',
         decorateReply: false,
     });
+    const authSecret = process.env.AUTH_SECRET;
+    if (!authSecret) {
+        throw new Error('CRITICAL CONFIGURATION ERROR: AUTH_SECRET environment variable is required.');
+    }
     app.register(cookie_1.default, {
-        secret: process.env.AUTH_SECRET || 'dev-cookie-secret-placeholder',
+        secret: authSecret,
         parseOptions: {},
     });
     // CORS Configuration
-    const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+    const isProd = process.env.NODE_ENV === 'production';
+    const defaultOrigins = isProd ? [] : ['http://localhost:3000', 'http://localhost:3001'];
     const envOrigins = process.env.CORS_ORIGINS
         ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
         : [];
@@ -172,12 +179,17 @@ function buildServer() {
     app.register(admin_routes_1.adminRoutes, { prefix: '/api/v1/admin' });
     // Public Catalog API Routes (Products & Categories)
     app.register(catalog_routes_1.catalogRoutes, { prefix: '/api/v1' });
+    // Public Marketplace Content API Route (allowlisted content.* settings)
+    app.register(content_routes_1.contentRoutes, { prefix: '/api/v1' });
     // Production Security Headers
-    app.addHook('onRequest', async (_request, reply) => {
+    app.addHook('onRequest', async (request, reply) => {
         reply.header('X-Content-Type-Options', 'nosniff');
         reply.header('X-Frame-Options', 'DENY');
         reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
         reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        if (process.env.NODE_ENV === 'production' && request.protocol === 'https') {
+            reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
     });
     // Sensitive API Cache-Control Hardening
     app.addHook('onSend', async (request, reply) => {

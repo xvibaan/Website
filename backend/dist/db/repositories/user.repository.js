@@ -56,6 +56,19 @@ class UserRepository {
             .returning();
         return result[0];
     }
+    /**
+     * Update a user record.
+     * Can optionally execute within an existing transaction.
+     */
+    async update(id, data, tx) {
+        const executor = tx || this.db;
+        const result = await executor
+            .update(users_1.users)
+            .set(data)
+            .where((0, drizzle_orm_1.eq)(users_1.users.id, id))
+            .returning();
+        return result[0] || null;
+    }
 }
 exports.UserRepository = UserRepository;
 /**

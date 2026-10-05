@@ -33,5 +33,13 @@ export declare class AuthService {
         createdAt: Date;
         updatedAt: Date;
     }): SafeUser;
+    /**
+     * Securely closes a user account.
+     * - Anonymizes personal data (email).
+     * - Deactivates the account (prevents login).
+     * - Disables the associated wallet to prevent transactions.
+     * - Preserves historical financial records tied to the user ID.
+     */
+    deleteAccount(userId: string): Promise<void>;
 }
 export declare const authService: AuthService;

@@ -248,7 +248,7 @@ class PaymentTransactionService {
                     paymentTransactionId: lockedTx.id,
                 };
             }
-            if (event.eventType === 'payment.succeeded') {
+            if (['payment.succeeded', 'payment.captured', 'order.paid'].includes(event.eventType)) {
                 // Mark payment transaction SUCCESS
                 await this.txRepo.updateStatus(lockedTx.id, {
                     status: 'SUCCESS',
@@ -284,7 +284,7 @@ class PaymentTransactionService {
                     paymentTransactionId: lockedTx.id,
                 };
             }
-            else if (event.eventType === 'payment.failed') {
+            else if (['payment.failed'].includes(event.eventType)) {
                 await this.txRepo.updateStatus(lockedTx.id, {
                     status: 'FAILED',
                     failureReason: 'Payment gateway reported failed transaction',
@@ -303,8 +303,8 @@ class PaymentTransactionService {
                     paymentTransactionId: lockedTx.id,
                 };
             }
-            else {
-                // Other events (e.g. cancelled)
+            else if (['payment.cancelled', 'order.cancelled'].includes(event.eventType)) {
+                // Explicitly cancelled events
                 await this.txRepo.updateStatus(lockedTx.id, {
                     status: 'CANCELLED',
                     failureReason: `Payment event: ${event.eventType}`,
@@ -320,6 +320,22 @@ class PaymentTransactionService {
                     success: true,
                     status: 'PROCESSED',
                     message: `Payment marked as CANCELLED; no wallet credit applied`,
+                    paymentTransactionId: lockedTx.id,
+                };
+            }
+            else {
+                // Safely ignore unknown or intermediate events (e.g., payment.authorized)
+                await this.webhookEventRepo.create({
+                    gateway: gatewayId,
+                    gatewayEventId: event.gatewayEventId,
+                    eventType: event.eventType,
+                    paymentReference: lockedTx.id,
+                    status: 'IGNORED',
+                }, tx);
+                return {
+                    success: true,
+                    status: 'IGNORED',
+                    message: `Payment event '${event.eventType}' ignored; no state change applied`,
                     paymentTransactionId: lockedTx.id,
                 };
             }

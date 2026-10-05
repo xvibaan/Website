@@ -23,6 +23,11 @@ export declare class UserRepository {
      * Can optionally execute within an existing transaction.
      */
     create(data: NewUser, tx?: DbTransaction): Promise<User>;
+    /**
+     * Update a user record.
+     * Can optionally execute within an existing transaction.
+     */
+    update(id: string, data: Partial<User>, tx?: DbTransaction): Promise<User | null>;
 }
 /**
  * Export default singleton instance for convenience.

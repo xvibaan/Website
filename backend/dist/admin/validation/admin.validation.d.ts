@@ -40,9 +40,9 @@ export declare const customerQuerySchema: z.ZodObject<{
         admin: "admin";
     }>>;
     isActive: z.ZodPipe<z.ZodOptional<z.ZodEnum<{
-        true: "true";
         false: "false";
-    }>>, z.ZodTransform<boolean | undefined, "true" | "false" | undefined>>;
+        true: "true";
+    }>>, z.ZodTransform<boolean | undefined, "false" | "true" | undefined>>;
 }, z.core.$strip>;
 export declare const customerIdParamSchema: z.ZodObject<{
     id: z.ZodString;
@@ -53,9 +53,9 @@ export declare const updateCustomerStatusSchema: z.ZodObject<{
 }, z.core.$strip>;
 export declare const categoryQuerySchema: z.ZodObject<{
     isActive: z.ZodPipe<z.ZodOptional<z.ZodEnum<{
-        true: "true";
         false: "false";
-    }>>, z.ZodTransform<boolean | undefined, "true" | "false" | undefined>>;
+        true: "true";
+    }>>, z.ZodTransform<boolean | undefined, "false" | "true" | undefined>>;
 }, z.core.$strip>;
 export declare const createCategorySchema: z.ZodObject<{
     slug: z.ZodString;

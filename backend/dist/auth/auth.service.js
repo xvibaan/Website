@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authService = exports.AuthService = void 0;
 const user_repository_1 = require("../db/repositories/user.repository");
@@ -104,6 +137,43 @@ class AuthService {
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
         };
+    }
+    /**
+     * Securely closes a user account.
+     * - Anonymizes personal data (email).
+     * - Deactivates the account (prevents login).
+     * - Disables the associated wallet to prevent transactions.
+     * - Preserves historical financial records tied to the user ID.
+     */
+    async deleteAccount(userId) {
+        const { getDb } = await Promise.resolve().then(() => __importStar(require('../db/client')));
+        const { walletRepository } = await Promise.resolve().then(() => __importStar(require('../db/repositories/wallet.repository')));
+        const db = getDb();
+        await db.transaction(async (tx) => {
+            const user = await this.userRepo.findById(userId, tx);
+            if (!user) {
+                const error = new Error('User not found');
+                error.statusCode = 404;
+                error.name = 'NotFound';
+                throw error;
+            }
+            if (!user.isActive && user.email.startsWith('deleted_')) {
+                // Already deleted
+                return;
+            }
+            const anonymizedEmail = `deleted_${user.id}@deleted.local`;
+            const anonymizedPassword = '*DELETED*';
+            await this.userRepo.update(userId, {
+                email: anonymizedEmail,
+                passwordHash: anonymizedPassword,
+                isActive: false,
+                updatedAt: new Date(),
+            }, tx);
+            const wallet = await walletRepository.findByUserId(userId, tx);
+            if (wallet && wallet.status !== 'disabled') {
+                await walletRepository.updateStatus(wallet.id, 'disabled', tx);
+            }
+        });
     }
 }
 exports.AuthService = AuthService;

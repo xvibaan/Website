@@ -77,5 +77,26 @@ const authRoutes = async (app) => {
             user,
         });
     });
+    /**
+     * DELETE /api/v1/auth/me
+     * Securely closes the authenticated user's account and clears session.
+     */
+    app.delete('/me', { preHandler: [auth_middleware_1.authenticate] }, async (request, reply) => {
+        if (!request.user) {
+            return reply.status(401).send({
+                statusCode: 401,
+                error: 'Unauthorized',
+                message: 'Authentication required',
+            });
+        }
+        await auth_service_1.authService.deleteAccount(request.user.userId);
+        reply.clearCookie(session_1.AUTH_COOKIE_NAME, {
+            path: '/',
+        });
+        return reply.status(200).send({
+            success: true,
+            message: 'Account has been successfully closed and personal data anonymized.',
+        });
+    });
 };
 exports.authRoutes = authRoutes;
