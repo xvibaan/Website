@@ -20,7 +20,7 @@ export const createPaymentSchema = z.object({
     .min(3, 'Currency code must be at least 3 characters')
     .max(5, 'Currency code must not exceed 5 characters')
     .default('INR')
-    .refine((curr) => curr === 'INR' || curr === 'USDT', 'Currently only INR and USDT currencies are supported'),
+    .refine((curr) => curr === 'INR', 'Currently only INR currency is supported'),
   purpose: z.enum(['WALLET_RECHARGE']).default('WALLET_RECHARGE'),
   gateway: z
     .string()

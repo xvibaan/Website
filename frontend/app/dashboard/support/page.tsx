@@ -39,7 +39,7 @@ export default function SupportPage() {
     faqItems: [
       {
         question: "How do I add funds to my wallet?",
-        answer: "Navigate to the Deposit / Wallet section, choose your preferred payment method from the available options (UPI QR or USDT), and complete the recharge. Your wallet balance updates automatically once verified.",
+        answer: "Navigate to the Deposit / Wallet section, choose your preferred payment method from the available options (UPI QR), and complete the recharge. Your wallet balance updates automatically once verified.",
       },
       {
         question: "How do I buy a product or Redeem Code?",

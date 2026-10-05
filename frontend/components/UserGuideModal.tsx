@@ -205,7 +205,7 @@ export default function UserGuideModal() {
                     <h4 className="text-sm font-bold text-white">Check Wallet Balance & Top-Up</h4>
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed pl-9">
-                    Ensure your marketplace wallet balance is sufficient for the total purchase price. If needed, click the &quot;Deposit / Recharge&quot; button to add funds instantly using dynamic UPI or USDT cryptocurrency gateways.
+                    Ensure your marketplace wallet balance is sufficient for the total purchase price. If needed, click the &quot;Deposit / Recharge&quot; button to add funds instantly using dynamic UPI gateways.
                   </p>
                 </div>
 

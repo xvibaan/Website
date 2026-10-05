@@ -31,14 +31,14 @@ export default function DepositPage() {
   const currentBalance = (user as any)?.wallet?.balance || 0.0;
 
   const [amount, setAmount] = useState<number>(500);
-  const [method, setMethod] = useState<"UPI" | "BINANCE">("UPI");
   const [step, setStep] = useState<"AMOUNT" | "PAYMENT" | "RAZORPAY_RESULT">("AMOUNT");
   const [status, setStatus] = useState<"PENDING" | "VERIFYING" | "SUCCESS" | "FAILED">("PENDING");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [minDeposit, setMinDeposit] = useState<{ INR: number; USDT: number }>({ INR: 10, USDT: 1 });
+  const [minDeposit, setMinDeposit] = useState<number>(10);
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
+
   // Fetch authoritative minimum deposit config from backend
   useEffect(() => {
     (async () => {
@@ -46,8 +46,8 @@ export default function DepositPage() {
         const res = await fetch("/api/config");
         if (res.ok) {
           const data = await res.json();
-          if (data.minDeposit) {
-            setMinDeposit({ INR: data.minDeposit.INR ?? 10, USDT: data.minDeposit.USDT ?? 1 });
+          if (data.minDeposit?.INR) {
+            setMinDeposit(data.minDeposit.INR);
           }
         }
       } catch {
@@ -56,23 +56,15 @@ export default function DepositPage() {
     })();
   }, []);
 
-  const currentMinDeposit = method === "UPI" ? minDeposit.INR : minDeposit.USDT;
-  const currencySymbol = method === "UPI" ? "₹" : "$";
-  const quickAmountsUPI = [200, 500, 1000, 2500, 5000];
-  const quickAmountsUSDT = [1, 5, 10, 25, 50];
-  const quickAmounts = method === "UPI" ? quickAmountsUPI : quickAmountsUSDT;
-
+  const currencySymbol = "₹";
+  const quickAmounts = [200, 500, 1000, 2500, 5000];
   const upiId = "hostpanal@upi";
-  const cryptoAddress = "0x71C836642F4Bf1Bb64b9c712B129A88741A9031d";
-  const paymentTarget = method === "UPI" ? upiId : cryptoAddress;
+  const paymentTarget = upiId;
 
   const generateQRCode = useCallback(async () => {
     try {
-      const payload =
-        method === "UPI"
-          ? `upi://pay?pa=${upiId}&pn=HostMarketPlace&am=${amount}&cu=INR&tn=HostMarketPlace-Deposit`
-          : `ethereum:${cryptoAddress}?value=${amount}`;
-      
+      const payload = `upi://pay?pa=${upiId}&pn=HostMarketPlace&am=${amount}&cu=INR&tn=HostMarketPlace-Deposit`;
+
       const url = await QRCode.toDataURL(payload, {
         width: 600,
         margin: 2,
@@ -86,7 +78,7 @@ export default function DepositPage() {
     } catch (err) {
       console.error("Failed to generate QR code:", err);
     }
-  }, [amount, method]);
+  }, [amount]);
 
   useEffect(() => {
     if (step === "PAYMENT") {
@@ -140,15 +132,11 @@ export default function DepositPage() {
 
           ctx.fillStyle = "#4b5563";
           ctx.font = "14px monospace";
-          ctx.fillText(
-            method === "UPI" ? `UPI ID: ${upiId}` : `USDT Network: TRC20 / BEP20`,
-            canvas.width / 2,
-            680
-          );
+          ctx.fillText(`UPI ID: ${upiId}`, canvas.width / 2, 680);
 
           ctx.font = "12px sans-serif";
           ctx.fillStyle = "#9ca3af";
-          ctx.fillText("Scan with any UPI or Crypto Wallet App", canvas.width / 2, 705);
+          ctx.fillText("Scan with any UPI App", canvas.width / 2, 705);
 
           const finalDataUrl = canvas.toDataURL("image/png");
           const link = document.createElement("a");
@@ -191,69 +179,52 @@ export default function DepositPage() {
   };
 
   const handleProceed = async () => {
-    if (amount >= currentMinDeposit) {
-      if (method === "UPI") {
-        setStatus("VERIFYING");
-        try {
-          const res = await api.post("/v1/payments/create", {
-            amount: amount.toString(),
-            currency: "INR",
-            purpose: "WALLET_RECHARGE",
-            gateway: "razorpay"
-          });
-          
-          if (!res.success) throw new Error("Payment creation failed");
-          
-          setPaymentTxId(res.paymentTransaction.id);
-          const orderId = res.gatewayOrderId;
-          
-          const isLoaded = await loadRazorpay();
-          if (!isLoaded) throw new Error("Failed to load Razorpay SDK");
-          
-          const options = {
-            key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "",
-            amount: Math.round(amount * 100).toString(),
-            currency: "INR",
-            name: "Host Market Place",
-            description: "Wallet Deposit",
-            order_id: orderId,
-            handler: function (response: any) {
-               setStep("RAZORPAY_RESULT");
-               setStatus("VERIFYING");
-               handleManualVerify(res.paymentTransaction.id);
-            },
-            prefill: {
-              email: user?.email || ""
-            },
-            theme: {
-              color: "#00c2ff"
-            }
-          };
-          
-          const rzp = new (window as any).Razorpay(options);
-          rzp.on('payment.failed', function (response: any){
-            setStep("RAZORPAY_RESULT");
-            setStatus("FAILED");
-          });
-          rzp.open();
-        } catch (err) {
-          console.error(err);
-          setStep("PAYMENT");
+    if (amount >= minDeposit) {
+      setStatus("VERIFYING");
+      try {
+        const res = await api.post("/v1/payments/create", {
+          amount: amount.toString(),
+          currency: "INR",
+          purpose: "WALLET_RECHARGE",
+          gateway: "razorpay"
+        });
+
+        if (!res.success) throw new Error("Payment creation failed");
+
+        setPaymentTxId(res.paymentTransaction.id);
+        const orderId = res.gatewayOrderId;
+
+        const isLoaded = await loadRazorpay();
+        if (!isLoaded) throw new Error("Failed to load Razorpay SDK");
+
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "",
+          amount: Math.round(amount * 100).toString(),
+          currency: "INR",
+          name: "Host Market Place",
+          description: "Wallet Deposit",
+          order_id: orderId,
+          handler: function (response: any) {
+             setStep("RAZORPAY_RESULT");
+             setStatus("VERIFYING");
+             handleManualVerify(res.paymentTransaction.id);
+          },
+          prefill: {
+            email: user?.email || ""
+          },
+          theme: {
+            color: "#00c2ff"
+          }
+        };
+
+        const rzp = new (window as any).Razorpay(options);
+        rzp.on('payment.failed', function (response: any){
+          setStep("RAZORPAY_RESULT");
           setStatus("FAILED");
-        }
-      } else {
-        // Binance flow
-        try {
-          const res = await api.post("/v1/payments/create", {
-            amount: amount.toString(),
-            currency: "USDT",
-            purpose: "WALLET_RECHARGE",
-            gateway: "dev-gateway"
-          });
-          setPaymentTxId(res.paymentTransaction.id);
-        } catch (err) {
-          console.error(err);
-        }
+        });
+        rzp.open();
+      } catch (err) {
+        console.error(err);
         setStep("PAYMENT");
         setStatus("PENDING");
       }
@@ -351,7 +322,7 @@ export default function DepositPage() {
                 <div className="pt-6 border-t border-white/[0.08] text-[11px] font-mono text-gray-400 space-y-1">
                   <div className="flex justify-between">
                     <span>Gateway:</span>
-                    <span className="text-white">{method === "UPI" ? "Instant UPI (India)" : "USDT (Binance)"}</span>
+                    <span className="text-white">Instant UPI (India)</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Account:</span>
@@ -367,40 +338,6 @@ export default function DepositPage() {
             <div className="rounded-3xl border border-white/10 bg-[#0c0e17]/85 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl">
               {step === "AMOUNT" ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  {/* Select Method */}
-                  <div>
-                    <label className="block text-xs font-mono uppercase tracking-widest text-gray-400 mb-3">
-                      Select Deposit Method
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setMethod("UPI")}
-                        className={`p-4 rounded-2xl border text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 outline-none ${
-                          method === "UPI"
-                            ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,194,255,0.2)] text-white"
-                            : "bg-white/[0.02] border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
-                        }`}
-                      >
-                        <div className="text-sm font-bold">Instant UPI</div>
-                        <div className="text-[11px] text-gray-400 mt-1">Google Pay, PhonePe, Paytm</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setMethod("BINANCE")}
-                        className={`p-4 rounded-2xl border text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 outline-none ${
-                          method === "BINANCE"
-                            ? "bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,194,255,0.2)] text-white"
-                            : "bg-white/[0.02] border-white/10 text-gray-400 hover:border-white/20 hover:text-white"
-                        }`}
-                      >
-                        <div className="text-sm font-bold">Binance / Crypto</div>
-                        <div className="text-[11px] text-gray-400 mt-1">USDT (TRC20 / BEP20)</div>
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Amount Input */}
                   <div>
                     <label className="block text-xs font-mono uppercase tracking-widest text-gray-400 mb-3">
@@ -412,8 +349,8 @@ export default function DepositPage() {
                       </span>
                       <input
                         type="number"
-                        min={currentMinDeposit}
-                        step={method === "BINANCE" ? "0.01" : "1"}
+                        min={minDeposit}
+                        step="1"
                         value={amount}
                         onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
                         className="w-full bg-black/60 border border-white/15 rounded-2xl py-3.5 pl-10 pr-4 text-2xl font-bold font-mono text-white focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-colors focus-visible:ring-2 focus-visible:ring-primary/60"
@@ -438,14 +375,14 @@ export default function DepositPage() {
                       ))}
                     </div>
                     <p className="text-[11px] text-gray-500 font-mono mt-2">
-                      Minimum required deposit: {currencySymbol}{currentMinDeposit}
+                      Minimum required deposit: {currencySymbol}{minDeposit}
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={handleProceed}
-                    disabled={amount < currentMinDeposit}
+                    disabled={amount < minDeposit}
                     className="w-full py-3.5 min-h-[48px] bg-primary hover:bg-primary-hover text-black font-bold text-xs uppercase tracking-wider rounded-2xl transition-colors shadow-[0_0_20px_rgba(0,194,255,0.25)] hover:shadow-[0_0_25px_rgba(0,194,255,0.4)] disabled:opacity-50 flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
                   >
                     <span>Generate Secure Payment QR</span>
@@ -463,7 +400,7 @@ export default function DepositPage() {
                       Scan QR Code to Pay ₹{amount}
                     </h2>
                     <p className="text-xs text-gray-400 mt-1">
-                      {method === "UPI" ? "Scan with any UPI app on your phone" : "Transfer USDT to the address"}
+                      Scan with any UPI app on your phone
                     </p>
                   </div>
 
@@ -474,7 +411,7 @@ export default function DepositPage() {
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={qrDataUrl}
-                          alt={`QR Code to pay ₹${amount} via ${method}`}
+                          alt={`QR Code to pay ₹${amount} via UPI`}
                           className="w-full h-full object-contain rounded-lg"
                         />
                       ) : (
@@ -506,7 +443,7 @@ export default function DepositPage() {
                         type="button"
                         onClick={handleCopyTarget}
                         className="py-2.5 px-3 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-xs font-mono transition-colors flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
-                        title={method === "UPI" ? "Copy UPI ID" : "Copy Crypto Address"}
+                        title="Copy UPI ID"
                       >
                         {isCopied ? (
                           <>
@@ -516,7 +453,7 @@ export default function DepositPage() {
                         ) : (
                           <>
                             <Copy className="w-3.5 h-3.5 shrink-0" />
-                            <span>{method === "UPI" ? "Copy UPI" : "Copy Addr"}</span>
+                            <span>Copy UPI</span>
                           </>
                         )}
                       </button>
@@ -590,7 +527,7 @@ export default function DepositPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="w-full max-w-sm space-y-4">
                     <button
                       type="button"
