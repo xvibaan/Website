@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Globe, ArrowLeft, ShieldAlert, Link as LinkIcon, Trash2, CheckCircle2, Server } from "lucide-react";
 import { api } from "../../../../lib/api";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export default function WebsiteInstanceDetail() {
   const [domainForm, setDomainForm] = useState({ hostname: "", hostnameType: "CUSTOM_DOMAIN" });
   const [error, setError] = useState("");
 
-  const fetchInstance = async () => {
+  const fetchInstance = useCallback(async () => {
     try {
       const res = await api.get(`/admin/website-instances/${id}`);
       setInstance(res.data.data);
@@ -24,11 +24,11 @@ export default function WebsiteInstanceDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchInstance();
-  }, [id]);
+  }, [fetchInstance]);
 
   const handleUpdateStatus = async (status: string) => {
     try {
