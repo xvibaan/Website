@@ -1101,6 +1101,75 @@ class AdminApiClient {
       orders: any[];
     }>('/orders');
   }
+
+  // Product Provider Offers (Failover Mappings)
+  async getProductProviderOffers(productId: string) {
+    return this.request<{
+      success: boolean;
+      offers: Array<{
+        id: string;
+        productId: string;
+        providerId: string;
+        variantId: string | null;
+        providerProductId: string | null;
+        providerVariantId: string | null;
+        priority: number;
+        isEnabled: boolean;
+        isMaintenance: boolean;
+        costPrice: string;
+        currency: string;
+        providerConfiguration: string | null;
+        fulfillmentCapability: string;
+        provider?: { id: string; name: string; code: string; adapterType: string; isEnabled: boolean; isMaintenance: boolean; operationalHealth: string };
+      }>;
+    }>(`/product-provider-offers/product/${productId}`);
+  }
+
+  async createProductProviderOffer(data: {
+    productId: string;
+    providerId: string;
+    variantId?: string | null;
+    providerProductId?: string | null;
+    providerVariantId?: string | null;
+    priority?: number;
+    isEnabled?: boolean;
+    isMaintenance?: boolean;
+    costPrice?: string;
+    currency?: string;
+    providerConfiguration?: string | null;
+    fulfillmentCapability?: string;
+  }) {
+    return this.request<{ success: boolean; offer: any }>('/product-provider-offers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProductProviderOffer(id: string, data: Partial<{
+    productId: string;
+    providerId: string;
+    variantId: string | null;
+    providerProductId: string | null;
+    providerVariantId: string | null;
+    priority: number;
+    isEnabled: boolean;
+    isMaintenance: boolean;
+    costPrice: string;
+    currency: string;
+    providerConfiguration: string | null;
+    fulfillmentCapability: string;
+  }>) {
+    return this.request<{ success: boolean; offer: any }>(`/product-provider-offers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProductProviderOffer(id: string) {
+    return this.request<{ success: boolean }>(`/product-provider-offers/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const adminApi = new AdminApiClient();
