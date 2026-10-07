@@ -2,6 +2,7 @@ import { pgTable, serial, uuid, varchar, text, numeric, integer, timestamp, inde
 import { sql } from 'drizzle-orm';
 import { users } from './users';
 import { products } from './products';
+import { productVariants } from './product-variants';
 import { providers } from './providers';
 import { resellers } from './resellers';
 
@@ -36,6 +37,7 @@ export const orderItems = pgTable(
     id: serial('id').primaryKey(),
     orderId: integer('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
     productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+    variantId: uuid('variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
     providerId: uuid('provider_id').references(() => providers.id, { onDelete: 'set null' }),
     providerProductId: varchar('provider_product_id', { length: 100 }),
     productNameSnapshot: varchar('product_name_snapshot', { length: 150 }).notNull(),

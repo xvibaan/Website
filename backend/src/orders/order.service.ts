@@ -3,10 +3,11 @@ import { orderRepository } from '../db/repositories/order.repository';
 import { walletService } from '../wallet/wallet.service';
 import { products } from '../db/schema/products';
 import { providers } from '../db/schema/providers';
+import { productProviderOffers } from '../db/schema/product-provider-offers';
 import { productVariants } from '../db/schema/product-variants';
 import { categories } from '../db/schema/categories';
-import { orders, Order, NewOrder, NewOrderItem } from '../db/schema/orders';
-import { eq, and, inArray } from 'drizzle-orm';
+import { orders, Order, NewOrder, NewOrderItem, orderItems } from '../db/schema/orders';
+import { eq, and, inArray, asc } from 'drizzle-orm';
 import { providerRegistry } from '../providers/registry/ProviderRegistry';
 import { providerResolver } from '../providers/services/ProviderResolver';
 import { alertService } from '../admin/services/alert.service';
@@ -20,7 +21,7 @@ export class OrderService {
     variantId?: string
   ) {
     const db = getDb();
-    
+
     // Idempotency Check
     if (idempotencyKey) {
       const existingOrder = await orderRepository.findOrderByReference(idempotencyKey);
@@ -31,7 +32,7 @@ export class OrderService {
           err.name = 'Conflict';
           throw err;
         }
-        
+
         const existingItems = await orderRepository.findOrderItemsByOrderId(existingOrder.id);
         const firstItem = existingItems[0];
         return {
@@ -63,7 +64,7 @@ export class OrderService {
         };
       }
     }
-    
+
     // 1. Validate Product
     const [product] = await db
       .select()
@@ -77,14 +78,17 @@ export class OrderService {
       throw err;
     }
 
-    // Provider Validation
-    let activeProvider = null;
-    let activeAdapter = null;
-    if (product.providerId) {
-      const resolved = await providerResolver.resolveActive(product.providerId);
-      activeProvider = resolved.provider;
-      activeAdapter = resolved.adapter;
+    const eligibleOffers = await this.getEligibleProviders(product.id, product, variantId);
+    if (eligibleOffers.length === 0) {
+      const err: any = new Error('No eligible providers currently available for this product');
+      err.statusCode = 503;
+      err.name = 'ServiceUnavailable';
+      throw err;
     }
+
+    // We start the transaction with the primary (first) offer
+    let activeOffer = eligibleOffers[0].offer;
+    let activeProvider = eligibleOffers[0].provider as any;
 
     // 2. Validate Variants & Determine Authoritative Price
     const existingVariants = await db
@@ -199,6 +203,7 @@ export class OrderService {
       const newItem: NewOrderItem = {
         orderId: order.id,
         productId: product.id,
+        variantId: variantId || null,
         providerId: product.providerId,
         providerProductId: product.providerProductId,
         productNameSnapshot: product.name,
@@ -239,34 +244,78 @@ export class OrderService {
       };
     });
 
-    // 6. Provider Fulfillment (Outside the DB Transaction)
+    // 6. Provider Fulfillment Failover Loop (Outside the DB Transaction)
     let finalOrder = result.order;
-    let finalItems = [result.orderItem];
+    let finalItem = result.orderItem;
+    let fulfillmentSuccess = false;
+    let isAmbiguous = false;
+    let finalProviderId: string | null = null;
 
-    if (result.provider && result.provider.isEnabled) {
-      const adapter = providerRegistry.getAdapter(result.provider.code);
-      if (adapter && adapter.fulfillOrder) {
-        try {
-          const fulfillment = await adapter.fulfillOrder({
-            orderReference: result.order.reference!,
-            providerProductId: result.product.providerProductId || '',
-            quantity: result.orderItem.quantity,
-          });
+    for (const { offer, provider } of eligibleOffers) {
+      // Update orderItem in DB if attempting a fallback provider
+      if (provider.id !== finalItem.providerId) {
+        const costToRecord = offer.costPrice || product.costPrice || '0.00';
+        [finalItem] = await db.update(orderItems)
+          .set({
+            providerId: provider.id,
+            providerProductId: offer.providerProductId || product.providerProductId,
+            providerCostSnapshot: costToRecord
+          })
+          .where(eq(orderItems.id, finalItem.id))
+          .returning();
+      }
 
-          if (fulfillment.status === 'FAILED') {
-            await this.recoverFailedOrder(result.order, result.totalAmount);
-            finalOrder = await orderRepository.updateOrder(result.order.id, { status: 'REFUNDED', deliveryStatus: 'FAILED' });
-          } else {
-            finalOrder = await orderRepository.updateOrder(result.order.id, { 
-              status: fulfillment.status === 'ACTIVE' ? 'COMPLETED' : 'PROCESSING',
-              deliveryStatus: fulfillment.status === 'ACTIVE' ? 'DELIVERED' : 'PENDING' 
-            });
-          }
-        } catch (err) {
-          finalOrder = await orderRepository.updateOrder(result.order.id, { status: 'PROCESSING' });
-        }
+      const adapter = providerRegistry.getAdapter(provider.code);
+      if (!adapter || !adapter.fulfillOrder) {
+        continue;
+      }
+
+      let fulfillment: any = null;
+      try {
+        fulfillment = await adapter.fulfillOrder({
+          orderReference: result.order.reference!,
+          providerProductId: offer.providerProductId || product.providerProductId || '',
+          providerVariantId: offer.providerVariantId || null,
+          quantity: finalItem.quantity,
+        });
+      } catch (err: any) {
+        console.warn(`[Failover] Provider ${provider.code} threw error for Order #${result.order.id}. Assuming AMBIGUOUS to prevent double-fulfillment. Error:`, err.message);
+        fulfillment = {
+          status: 'AMBIGUOUS',
+          message: err.message
+        };
+      }
+
+      if (fulfillment.status === 'AMBIGUOUS') {
+        fulfillmentSuccess = false;
+        isAmbiguous = true;
+        finalOrder = await orderRepository.updateOrder(result.order.id, {
+          status: 'PROCESSING',
+          deliveryStatus: 'PENDING'
+        });
+        await db.update(orderItems).set({ fulfillmentStatus: 'PENDING_PROVIDER_VERIFICATION' }).where(eq(orderItems.id, finalItem.id));
+        finalProviderId = provider.id;
+        break; // Stop loop, do not attempt next provider on ambiguous state
+      } else if (fulfillment.status !== 'FAILED') {
+        fulfillmentSuccess = true;
+        finalOrder = await orderRepository.updateOrder(result.order.id, {
+          status: fulfillment.status === 'ACTIVE' ? 'COMPLETED' : 'PROCESSING',
+          deliveryStatus: fulfillment.status === 'ACTIVE' ? 'DELIVERED' : 'PENDING'
+        });
+        finalProviderId = provider.id;
+        break; // Stop loop, we succeeded
       }
     }
+
+    if (!fulfillmentSuccess && !isAmbiguous) {
+      // All eligible providers definitely failed
+      console.error(`[Failover] All eligible providers definitely failed for Order #${result.order.id}. Initiating refund.`);
+      await this.recoverFailedOrder(result.order, result.totalAmount);
+      finalOrder = await orderRepository.updateOrder(result.order.id, { status: 'REFUNDED', deliveryStatus: 'FAILED' });
+      await db.update(orderItems).set({ fulfillmentStatus: 'FAILED' }).where(eq(orderItems.id, finalItem.id));
+    }
+
+    const finalItems = [finalItem];
 
     return {
       orderId: finalOrder.id,
@@ -320,7 +369,7 @@ export class OrderService {
    */
   async reconcileSingleOrder(orderId: number) {
     const db = getDb();
-    
+
     const workerClaimId = `claim-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
     // 1. Atomically Claim the Order
@@ -334,13 +383,13 @@ export class OrderService {
 
       let meta: any = {};
       try { meta = JSON.parse(lockedOrder.metadata || '{}'); } catch(e) {}
-      
+
       const now = Date.now();
       // If claimed in the last 60 seconds, skip (worker claim lease)
       if (meta.reconcileClaimedAt && now - meta.reconcileClaimedAt < 60000) {
         return null;
       }
-      
+
       if (meta.reconcileClaimedAt && now - meta.reconcileClaimedAt >= 60000) {
         alertService.raiseAlert({
           type: 'ORDER_RECONCILIATION_FAILURE',
@@ -353,18 +402,18 @@ export class OrderService {
       meta.reconcileClaimedAt = now;
       meta.reconcileClaimId = workerClaimId;
       const updated = await orderRepository.updateOrder(orderId, { metadata: JSON.stringify(meta) }, tx);
-      
+
       let provId: string | null = null;
       const items = await orderRepository.findOrderItemsByOrderId(orderId, tx);
       if (items.length > 0) {
         provId = items[0].providerId;
       }
-      
+
       return { order: updated, providerId: provId };
     });
 
     if (!claimResult || !claimResult.order || !claimResult.providerId) return;
-    
+
     const claimedOrder = claimResult.order;
     const originalProviderId = claimResult.providerId;
 
@@ -377,23 +426,24 @@ export class OrderService {
 
     let nextStatus: any = 'PROCESSING';
     let nextDelivery = 'PENDING';
-    let shouldRefund = false;
+    let shouldFallback = false;
 
     try {
-      const providerStatus = await adapter.getOrderStatus(claimedOrder.reference!);
+      const providerStatus = adapter.reconcileFulfillment
+        ? await adapter.reconcileFulfillment(claimedOrder.reference!)
+        : await adapter.getOrderStatus(claimedOrder.reference!);
+
       if (providerStatus.status === 'ACTIVE' || providerStatus.status === 'COMPLETED' as any) {
         nextStatus = 'COMPLETED';
         nextDelivery = 'DELIVERED';
         console.log(`[Reconciliation] Order #${orderId} successfully reconciled to ${nextStatus}`);
       } else if (providerStatus.status === 'FAILED' || providerStatus.status === 'TERMINATED') {
-        nextStatus = 'REFUNDED';
-        nextDelivery = 'FAILED';
-        shouldRefund = true;
-        
+        shouldFallback = true;
+
         alertService.raiseAlert({
           type: 'ORDER_RECONCILIATION_FAILURE',
           severity: 'HIGH',
-          message: `Definitive provider failure for Order #${orderId}, initiating automatic refund`,
+          message: `Definitive provider failure for Order #${orderId}, attempting fallback`,
           details: { orderId, providerStatus: providerStatus.status, reference: claimedOrder.reference }
         }).catch(console.error);
       }
@@ -422,19 +472,100 @@ export class OrderService {
         return;
       }
 
-      if (shouldRefund) {
-        await this.recoverFailedOrder(finalLock as any, finalLock.totalAmount, tx);
-      }
-
       delete finalMeta.reconcileClaimedAt;
       delete finalMeta.reconcileClaimId;
 
-      await orderRepository.updateOrder(orderId, { 
-        status: nextStatus, 
-        deliveryStatus: nextDelivery,
-        metadata: Object.keys(finalMeta).length ? JSON.stringify(finalMeta) : null
-      }, tx);
+      if (shouldFallback) {
+        await orderRepository.updateOrder(orderId, {
+          metadata: Object.keys(finalMeta).length ? JSON.stringify(finalMeta) : null
+        }, tx);
+      } else {
+        await orderRepository.updateOrder(orderId, {
+          status: nextStatus,
+          deliveryStatus: nextDelivery,
+          metadata: Object.keys(finalMeta).length ? JSON.stringify(finalMeta) : null
+        }, tx);
+      }
     });
+
+    if (shouldFallback) {
+      await this.attemptFallback(orderId, originalProviderId);
+    }
+  }
+
+  /**
+   * Attempts to resume failover for an order after an ambiguous outcome resolved to definitive failure.
+   */
+  async attemptFallback(orderId: number, failedProviderId: string) {
+    const db = getDb();
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+    if (!order || order.status !== 'PROCESSING') return;
+
+    const items = await orderRepository.findOrderItemsByOrderId(orderId);
+    if (!items.length) return;
+    const finalItem = items[0];
+    if (!finalItem.productId) return;
+
+    const [product] = await db.select().from(products).where(eq(products.id, finalItem.productId));
+    if (!product) return;
+
+    const variantId = finalItem.variantId || undefined;
+
+    const eligibleOffers = await this.getEligibleProviders(product.id, undefined, variantId);
+
+    // Find where the failed provider was in the sequence
+    const failedIndex = eligibleOffers.findIndex(o => o.provider.id === failedProviderId);
+    const remainingOffers = failedIndex >= 0 ? eligibleOffers.slice(failedIndex + 1) : [];
+
+    let fulfillmentSuccess = false;
+    let isAmbiguous = false;
+
+    for (const { offer, provider } of remainingOffers) {
+      // Create new items for fallbacks if needed, or reuse
+      await db.update(orderItems).set({
+        providerId: provider.id,
+        providerProductId: offer.providerProductId || product.providerProductId,
+        providerCostSnapshot: offer.costPrice || product.costPrice || '0.00'
+      }).where(eq(orderItems.id, finalItem.id));
+
+      const adapter = providerRegistry.getAdapter(provider.code);
+      if (!adapter || !adapter.fulfillOrder) continue;
+
+      let fulfillment: any = null;
+      try {
+        fulfillment = await adapter.fulfillOrder({
+          orderReference: order.reference!,
+          providerProductId: offer.providerProductId || product.providerProductId || '',
+          providerVariantId: offer.providerVariantId || null,
+          quantity: finalItem.quantity,
+        });
+      } catch (err: any) {
+        console.warn(`[Failover-Fallback] Provider ${provider.code} threw error for Order #${orderId}. Assuming AMBIGUOUS. Error:`, err.message);
+        fulfillment = { status: 'AMBIGUOUS', message: err.message };
+      }
+
+      if (fulfillment.status === 'AMBIGUOUS') {
+        fulfillmentSuccess = false;
+        isAmbiguous = true;
+        await db.update(orderItems).set({ fulfillmentStatus: 'PENDING_PROVIDER_VERIFICATION' }).where(eq(orderItems.id, finalItem.id));
+        break; // Stop loop, do not attempt next provider on ambiguous state
+      } else if (fulfillment.status !== 'FAILED') {
+        fulfillmentSuccess = true;
+        await orderRepository.updateOrder(orderId, {
+          status: fulfillment.status === 'ACTIVE' ? 'COMPLETED' : 'PROCESSING',
+          deliveryStatus: fulfillment.status === 'ACTIVE' ? 'DELIVERED' : 'PENDING'
+        });
+        await db.update(orderItems).set({ fulfillmentStatus: 'DELIVERED' }).where(eq(orderItems.id, finalItem.id));
+        break; // Stop loop, we succeeded
+      }
+    }
+
+    if (!fulfillmentSuccess && !isAmbiguous) {
+      console.error(`[Failover-Fallback] All remaining eligible providers definitively failed for Order #${orderId}. Initiating refund.`);
+      await this.recoverFailedOrder(order as any, order.totalAmount);
+      await orderRepository.updateOrder(orderId, { status: 'REFUNDED', deliveryStatus: 'FAILED' });
+      await db.update(orderItems).set({ fulfillmentStatus: 'FAILED' }).where(eq(orderItems.id, finalItem.id));
+    }
   }
 
   /**
@@ -468,7 +599,7 @@ export class OrderService {
 
     for (const order of orders) {
       const items = await orderRepository.findOrderItemsByOrderId(order.id);
-      
+
       const mappedItems = items.map((item) => ({
         id: item.id,
         productNameSnapshot: item.productNameSnapshot,
@@ -509,6 +640,78 @@ export class OrderService {
     }
 
     return result;
+  }
+
+  async getEligibleProviders(productId: string, productContext?: any, requestedVariantId?: string) {
+    const db = getDb();
+    let eligibleOffers: any[] = [];
+
+    // A. Variant-specific offers
+    if (requestedVariantId) {
+      eligibleOffers = await db.select({
+        offer: productProviderOffers,
+        provider: providers,
+      })
+      .from(productProviderOffers)
+      .innerJoin(providers, eq(providers.id, productProviderOffers.providerId))
+      .where(and(
+        eq(productProviderOffers.productId, productId),
+        eq(productProviderOffers.variantId, requestedVariantId),
+        eq(productProviderOffers.isEnabled, true),
+        eq(productProviderOffers.isMaintenance, false),
+        eq(providers.isEnabled, true),
+        eq(providers.isMaintenance, false)
+      ))
+      .orderBy(asc(productProviderOffers.priority));
+    }
+
+    // B. Fallback to product-level offers (variant_id IS NULL)
+    if (eligibleOffers.length === 0) {
+      const { isNull } = await import('drizzle-orm');
+      eligibleOffers = await db.select({
+        offer: productProviderOffers,
+        provider: providers,
+      })
+      .from(productProviderOffers)
+      .innerJoin(providers, eq(providers.id, productProviderOffers.providerId))
+      .where(and(
+        eq(productProviderOffers.productId, productId),
+        isNull(productProviderOffers.variantId),
+        eq(productProviderOffers.isEnabled, true),
+        eq(productProviderOffers.isMaintenance, false),
+        eq(providers.isEnabled, true),
+        eq(providers.isMaintenance, false)
+      ))
+      .orderBy(asc(productProviderOffers.priority));
+    }
+
+    // E. Legacy fallback to products.provider_id
+    if (eligibleOffers.length === 0 && productContext && productContext.providerId) {
+      const resolved = await providerResolver.resolveActive(productContext.providerId).catch(() => null);
+      if (resolved && resolved.provider.isEnabled && !resolved.provider.isMaintenance) {
+        eligibleOffers = [{
+          provider: resolved.provider as any,
+          offer: {
+            providerProductId: productContext.providerProductId,
+            providerVariantId: null,
+            costPrice: productContext.costPrice || '0.00',
+            currency: productContext.currency || 'INR',
+          } as any
+        }];
+      }
+    }
+
+    // D. Ensure no duplicate providers in the sequence
+    const uniqueProviders = new Set<string>();
+    const deduplicatedOffers = [];
+    for (const item of eligibleOffers) {
+      if (!uniqueProviders.has(item.provider.id)) {
+        uniqueProviders.add(item.provider.id);
+        deduplicatedOffers.push(item);
+      }
+    }
+
+    return deduplicatedOffers;
   }
 }
 

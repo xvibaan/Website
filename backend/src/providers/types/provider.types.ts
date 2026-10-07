@@ -59,13 +59,15 @@ export interface ProviderProduct {
 export interface ProviderOrderRequest {
   orderReference: string;
   providerProductId: string;
+  providerVariantId?: string | null;
   quantity: number;
   config?: Record<string, any>;
 }
 
 export interface ProviderOrderResult {
-  providerOrderId: string;
-  status: 'PENDING' | 'ACTIVE' | 'FAILED';
+  providerOrderId?: string;
+  status: 'PENDING' | 'ACTIVE' | 'FAILED' | 'AMBIGUOUS';
+
   rawStatus?: string;
   message?: string;
   createdAt: Date;
