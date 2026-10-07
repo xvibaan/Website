@@ -404,18 +404,23 @@ export class OrderService {
       const updated = await orderRepository.updateOrder(orderId, { metadata: JSON.stringify(meta) }, tx);
 
       let provId: string | null = null;
+      let isAmbiguousState = false;
       const items = await orderRepository.findOrderItemsByOrderId(orderId, tx);
       if (items.length > 0) {
         provId = items[0].providerId;
+        if (items[0].fulfillmentStatus === 'PENDING_PROVIDER_VERIFICATION') {
+          isAmbiguousState = true;
+        }
       }
 
-      return { order: updated, providerId: provId };
+      return { order: updated, providerId: provId, isAmbiguousState };
     });
 
     if (!claimResult || !claimResult.order || !claimResult.providerId) return;
 
     const claimedOrder = claimResult.order;
     const originalProviderId = claimResult.providerId;
+    const isAmbiguousState = claimResult.isAmbiguousState;
 
     // 2. Perform external HTTP Provider Lookup entirely OUTSIDE the DB lock
     const [provider] = await db.select().from(providers).where(eq(providers.id, originalProviderId));
@@ -428,8 +433,10 @@ export class OrderService {
     let nextDelivery = 'PENDING';
     let shouldFallback = false;
 
+    const hasReconciliation = adapter.supportsReconciliation ? adapter.supportsReconciliation() : false;
+
     try {
-      const providerStatus = adapter.reconcileFulfillment
+      const providerStatus = (hasReconciliation && adapter.reconcileFulfillment)
         ? await adapter.reconcileFulfillment(claimedOrder.reference!)
         : await adapter.getOrderStatus(claimedOrder.reference!);
 
@@ -438,14 +445,23 @@ export class OrderService {
         nextDelivery = 'DELIVERED';
         console.log(`[Reconciliation] Order #${orderId} successfully reconciled to ${nextStatus}`);
       } else if (providerStatus.status === 'FAILED' || providerStatus.status === 'TERMINATED') {
-        shouldFallback = true;
-
-        alertService.raiseAlert({
-          type: 'ORDER_RECONCILIATION_FAILURE',
-          severity: 'HIGH',
-          message: `Definitive provider failure for Order #${orderId}, attempting fallback`,
-          details: { orderId, providerStatus: providerStatus.status, reference: claimedOrder.reference }
-        }).catch(console.error);
+        if (isAmbiguousState && !hasReconciliation) {
+          console.warn(`[Reconciliation] Order #${orderId} is AMBIGUOUS but provider lacks reconciliation. Ignoring FAILED status to prevent unsafe fallback.`);
+          alertService.raiseAlert({
+            type: 'ORDER_RECONCILIATION_FAILURE',
+            severity: 'HIGH',
+            message: `Order #${orderId} requires manual review. Provider returned FAILED but lacks reconciliation support.`,
+            details: { orderId, providerStatus: providerStatus.status, reference: claimedOrder.reference }
+          }).catch(console.error);
+        } else {
+          shouldFallback = true;
+          alertService.raiseAlert({
+            type: 'ORDER_RECONCILIATION_FAILURE',
+            severity: 'HIGH',
+            message: `Definitive provider failure for Order #${orderId}, attempting fallback`,
+            details: { orderId, providerStatus: providerStatus.status, reference: claimedOrder.reference }
+          }).catch(console.error);
+        }
       }
     } catch (err: any) {
       console.error(`Reconciliation lookup failed for Order #${orderId}:`, err);

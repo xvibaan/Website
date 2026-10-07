@@ -70,6 +70,16 @@ export interface IProviderAdapter {
   getOrderStatus?(providerOrderId: string): Promise<ProviderOrderStatusResult>;
 
   /**
+   * Indicates if the adapter supports active reconciliation to resolve ambiguous states.
+   */
+  supportsReconciliation?(): boolean;
+
+  /**
+   * Reconciles a pending or ambiguous order using idempotency keys or references.
+   */
+  reconcileFulfillment?(orderReference: string): Promise<ProviderOrderResult>;
+
+  /**
    * Requests cancellation/termination of a provider service or order where supported.
    */
   cancelOrder?(providerOrderId: string): Promise<ProviderCancelOrderResult>;
