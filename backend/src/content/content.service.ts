@@ -36,6 +36,7 @@ export const PUBLIC_CONTENT_KEYS = {
   helpSupport: 'content.help_support',
   userGuide: 'content.user_guide',
   globalLinks: 'content.global_links',
+  supportEmail: 'support_email',
 } as const;
 
 const ALLOWED_KEY_LIST: string[] = Object.values(PUBLIC_CONTENT_KEYS);
@@ -145,7 +146,7 @@ export const DEFAULT_PUBLIC_CONTENT: PublicContentSettings = {
       'Find answers to common questions about wallet deposits, order fulfillment, and digital product delivery.',
     telegramSupportUrl: 'https://t.me/host_marketplace_support',
     discordSupportUrl: 'https://discord.gg/hostmarketplace',
-    contactEmail: 'support@hostmarketplace.com',
+    contactEmail: 'supporthostmarket@gmail.com',
     faqItems: [
       {
         question: 'How do I add funds to my wallet?',
@@ -214,7 +215,7 @@ export const DEFAULT_PUBLIC_CONTENT: PublicContentSettings = {
       { stepNumber: '03', title: 'Browse Products', description: 'Explore digital products across Gaming, Development, Redeem Codes, AI Tools, Cloud Hosting, and Software Tools.' },
       { stepNumber: '04', title: 'Check Product Details', description: 'Review comprehensive product descriptions, features, pricing, and availability details before making a purchase.' },
       { stepNumber: '05', title: 'Buy With Wallet', description: "Click 'Buy Now' to complete your order instantly using your central marketplace wallet balance." },
-      { stepNumber: '06', title: 'Order Processing', description: 'Once placed, your order is automatically transmitted to the appropriate service provider for instant fulfillment.' },
+      { stepNumber: '06', title: 'Order Processing', description: 'Once placed, your order is automatically transmitted to the appropriate service provider for fulfillment.' },
       { stepNumber: '07', title: 'View Your Purchase', description: 'Access your order result, delivery details, and license or product credentials directly in Order History and Purchased Products.' },
       { stepNumber: '08', title: 'Redeem Codes', description: 'Redeem Codes are digital products sold by the marketplace. Purchase available code products to receive your actual code delivered upon successful fulfillment.' },
       { stepNumber: '09', title: 'Support', description: 'If you need assistance with an order or payment, reach out directly through our built-in Support Desk.' },
@@ -286,7 +287,10 @@ export function buildPublicContent(
     modulesHeadline: str(k.modulesHeadline, d.modulesHeadline),
     modulesSubtext: str(k.modulesSubtext, d.modulesSubtext),
     announcement: parseSection(k.announcement, raw.get(k.announcement), announcementSchema, d.announcement, onWarning),
-    helpSupport: parseSection(k.helpSupport, raw.get(k.helpSupport), helpSupportSchema, d.helpSupport, onWarning),
+    helpSupport: {
+      ...parseSection(k.helpSupport, raw.get(k.helpSupport), helpSupportSchema, d.helpSupport, onWarning),
+      contactEmail: str(k.supportEmail, d.helpSupport.contactEmail || ''),
+    },
     userGuide: parseSection(k.userGuide, raw.get(k.userGuide), userGuideSchema, d.userGuide, onWarning),
     globalLinks: parseSection(k.globalLinks, raw.get(k.globalLinks), globalLinksSchema, d.globalLinks, onWarning),
   };

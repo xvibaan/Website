@@ -12,7 +12,7 @@ export class SettingsAdminService {
       business_timezone: { value: 'Asia/Kolkata', description: 'Authoritative accounting timezone', updatedAt: new Date() },
       default_currency: { value: 'INR', description: 'Default system currency', updatedAt: new Date() },
       maintenance_mode: { value: 'false', description: 'System-wide maintenance toggle', updatedAt: new Date() },
-      support_email: { value: 'support@hostmarket.local', description: 'Platform support email', updatedAt: new Date() },
+      support_email: { value: 'supporthostmarket@gmail.com', description: 'Platform support email', updatedAt: new Date() },
       telegram_support_url: { value: 'https://t.me/HostMarketSupport', description: 'Central Telegram support link', updatedAt: new Date() },
       min_deposit_inr: { value: '10', description: 'Minimum wallet deposit amount in INR', updatedAt: new Date() },
       min_deposit_usdt: { value: '1', description: 'Minimum wallet deposit amount in USDT', updatedAt: new Date() },
