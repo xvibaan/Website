@@ -715,6 +715,15 @@ export default function ProductDetailPage() {
             <option value="DISCONTINUED" className="bg-[#0b0e17] text-red-400">DISCONTINUED</option>
           </select>
 
+          <Link
+            href={`/admin/products/${productId}/providers`}
+            className="flex items-center gap-2 p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 hover:text-white transition-all text-xs font-semibold"
+            title="Configure Failover Providers"
+          >
+            <Server className="w-4 h-4" />
+            <span className="hidden sm:inline">Provider Failover</span>
+          </Link>
+
           <button
             onClick={fetchProductData}
             disabled={loading}
