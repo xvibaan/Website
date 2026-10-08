@@ -1,12 +1,12 @@
 import { Metadata } from "next";
+import { buildMetadata, LEGAL_PAGES_FINALIZED } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Refund Policy",
   description: "Refund policy and guidelines for purchases.",
-  alternates: {
-    canonical: "https://hostmarketplace.store/refund-policy",
-  },
-};
+  path: "/refund-policy",
+  noindex: !LEGAL_PAGES_FINALIZED,
+});
 
 export default function RefundPolicyPage() {
   return (
@@ -23,7 +23,7 @@ export default function RefundPolicyPage() {
         <section>
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">1. Introduction</h2>
           <p>
-            At [INSERT_LEGAL_COMPANY_NAME], we want to ensure your satisfaction with our products. This document outlines our refund eligibility.
+            At Host Market Place, we want to ensure your satisfaction with our products. This document outlines our refund eligibility.
           </p>
         </section>
 
@@ -32,15 +32,17 @@ export default function RefundPolicyPage() {
           <ul className="list-disc pl-5 space-y-2 text-sm md:text-base text-gray-400">
             <li><strong>Refund Timeframe:</strong> [INSERT_REFUND_TIMEFRAME]</li>
             <li>Digital goods may have specific non-refundable conditions depending on the nature of the product.</li>
-            <li><strong>Company Name:</strong> [INSERT_LEGAL_COMPANY_NAME]</li>
-            <li><strong>Contact Support for Refunds:</strong> [INSERT_SUPPORT_EMAIL]</li>
+            <li><strong>Brand / Business Name:</strong> Host Market Place</li>
+            <li><strong>Owner / Operator:</strong> Host</li>
+            <li><strong>Legal Entity:</strong> No registered company/legal entity is publicly claimed under the name Host Market Place.</li>
+            <li><strong>Contact Support for Refunds:</strong> supporthostmarket@gmail.com</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">3. Process for Requesting a Refund</h2>
           <p>
-            To initiate a refund, please contact us at [INSERT_SUPPORT_EMAIL] within the designated [INSERT_REFUND_TIMEFRAME]. Ensure you provide your order number and the reason for the request.
+            To initiate a refund, please contact us at supporthostmarket@gmail.com within the designated [INSERT_REFUND_TIMEFRAME]. Ensure you provide your order number and the reason for the request.
           </p>
         </section>
       </div>

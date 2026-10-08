@@ -1,12 +1,12 @@
 import { Metadata } from "next";
+import { buildMetadata, LEGAL_PAGES_FINALIZED } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Privacy Policy",
   description: "Privacy Policy outlining data collection and usage.",
-  alternates: {
-    canonical: "https://hostmarketplace.store/privacy",
-  },
-};
+  path: "/privacy",
+  noindex: !LEGAL_PAGES_FINALIZED,
+});
 
 export default function PrivacyPolicyPage() {
   return (
@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
         <section>
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">1. Introduction</h2>
           <p>
-            At [INSERT_LEGAL_COMPANY_NAME], we are committed to protecting your privacy. This policy outlines how we collect, use, and safeguard your data.
+            At Host Market Place, we are committed to protecting your privacy. This policy outlines how we collect, use, and safeguard your data.
           </p>
         </section>
 
@@ -31,9 +31,11 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">2. Information Collection</h2>
           <ul className="list-disc pl-5 space-y-2 text-sm md:text-base text-gray-400">
             <li>We collect information you provide directly to us, such as when you create an account, make a purchase, or contact support.</li>
-            <li><strong>Company Name:</strong> [INSERT_LEGAL_COMPANY_NAME]</li>
-            <li><strong>Contact Email for Privacy Inquiries:</strong> [INSERT_SUPPORT_EMAIL]</li>
-            <li><strong>Governing Law/Jurisdiction:</strong> [INSERT_GOVERNING_LAW_JURISDICTION]</li>
+            <li><strong>Brand / Business Name:</strong> Host Market Place</li>
+            <li><strong>Owner / Operator:</strong> Host</li>
+            <li><strong>Legal Entity:</strong> No registered company/legal entity is publicly claimed under the name Host Market Place.</li>
+            <li><strong>Contact Email for Privacy Inquiries:</strong> supporthostmarket@gmail.com</li>
+            <li><strong>Governing Law/Jurisdiction:</strong> India, Punjab</li>
           </ul>
         </section>
 

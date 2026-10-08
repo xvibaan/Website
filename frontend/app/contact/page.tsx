@@ -1,12 +1,12 @@
 import { Metadata } from "next";
+import { buildMetadata, LEGAL_PAGES_FINALIZED } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Contact Us",
   description: "Get in touch with support for any inquiries.",
-  alternates: {
-    canonical: "https://hostmarketplace.store/contact",
-  },
-};
+  path: "/contact",
+  noindex: !LEGAL_PAGES_FINALIZED,
+});
 
 export default function ContactPage() {
   return (
@@ -30,9 +30,11 @@ export default function ContactPage() {
         <section>
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">2. Business Contact Information</h2>
           <ul className="list-disc pl-5 space-y-2 text-sm md:text-base text-gray-400">
-            <li><strong>Company Name:</strong> [INSERT_LEGAL_COMPANY_NAME]</li>
-            <li><strong>Registered Address:</strong> [INSERT_REGISTERED_ADDRESS]</li>
-            <li><strong>Email:</strong> [INSERT_SUPPORT_EMAIL]</li>
+            <li><strong>Brand / Business Name:</strong> Host Market Place</li>
+            <li><strong>Owner / Operator:</strong> Host</li>
+            <li><strong>Legal Entity:</strong> No registered company/legal entity is publicly claimed under the name Host Market Place.</li>
+            <li><strong>Registered Address:</strong> No registered office address is currently published.</li>
+            <li><strong>Email:</strong> supporthostmarket@gmail.com</li>
           </ul>
         </section>
       </div>

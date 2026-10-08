@@ -1,12 +1,12 @@
 import { Metadata } from "next";
+import { buildMetadata, LEGAL_PAGES_FINALIZED } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildMetadata({
   title: "Terms of Service",
   description: "Terms of Service and conditions for using the marketplace.",
-  alternates: {
-    canonical: "https://hostmarketplace.store/terms",
-  },
-};
+  path: "/terms",
+  noindex: !LEGAL_PAGES_FINALIZED,
+});
 
 export default function TermsPage() {
   return (
@@ -23,17 +23,19 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">1. Introduction</h2>
           <p>
-            Welcome to [INSERT_LEGAL_COMPANY_NAME]. By accessing our website, you agree to these Terms of Service.
+            Welcome to Host Market Place. By accessing our website, you agree to these Terms of Service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">2. Company Information</h2>
+          <h2 className="text-xl font-bold text-white mb-4 border-b border-white/10 pb-2">2. Business Information</h2>
           <ul className="list-disc pl-5 space-y-2 text-sm md:text-base text-gray-400">
-            <li><strong className="text-gray-200">Company Name:</strong> [INSERT_LEGAL_COMPANY_NAME]</li>
-            <li><strong className="text-gray-200">Registered Address:</strong> [INSERT_REGISTERED_ADDRESS]</li>
-            <li><strong className="text-gray-200">Contact Email:</strong> [INSERT_SUPPORT_EMAIL]</li>
-            <li><strong className="text-gray-200">Governing Law/Jurisdiction:</strong> [INSERT_GOVERNING_LAW_JURISDICTION]</li>
+            <li><strong className="text-gray-200">Brand / Business Name:</strong> Host Market Place</li>
+            <li><strong className="text-gray-200">Owner / Operator:</strong> Host</li>
+            <li><strong className="text-gray-200">Legal Entity:</strong> No registered company/legal entity is publicly claimed under the name Host Market Place.</li>
+            <li><strong className="text-gray-200">Registered Address:</strong> No registered office address is currently published.</li>
+            <li><strong className="text-gray-200">Contact Email:</strong> supporthostmarket@gmail.com</li>
+            <li><strong className="text-gray-200">Governing Law/Jurisdiction:</strong> India, Punjab</li>
           </ul>
         </section>
 
