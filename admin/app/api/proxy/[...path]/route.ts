@@ -35,7 +35,7 @@ async function proxyRequest(
     const backendUrl = `${backendBase}/api/v1/${path}${queryString}`;
 
     // Read the session cookie from the incoming same-origin request
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(COOKIE_NAME);
 
     // Build headers to forward
@@ -129,41 +129,41 @@ async function proxyRequest(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
   // In Next.js 14.2+, params may be a promise in some configurations
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await context.params;
   return proxyRequest(request, resolvedParams.path);
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await context.params;
   return proxyRequest(request, resolvedParams.path);
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await context.params;
   return proxyRequest(request, resolvedParams.path);
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await context.params;
   return proxyRequest(request, resolvedParams.path);
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  context: { params: Promise<{ path: string[] }> }
 ) {
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await context.params;
   return proxyRequest(request, resolvedParams.path);
 }

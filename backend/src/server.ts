@@ -75,16 +75,34 @@ export function buildServer(): FastifyInstance {
   app.setErrorHandler((error, request, reply) => {
     app.log.error({ err: error, reqId: request.id }, 'Unhandled Request Error');
 
-    const statusCode = error.statusCode && error.statusCode >= 400 && error.statusCode < 600
-      ? error.statusCode
-      : 500;
+    let statusCode = 500;
+    let errorName = 'InternalServerError';
+    let errorMessage = 'An unexpected error occurred';
+
+    if (error instanceof Error) {
+      errorName = error.name;
+      errorMessage = error.message;
+    }
+
+    if (error !== null && typeof error === 'object') {
+      const errObj = error as Record<string, unknown>;
+      if (typeof errObj.statusCode === 'number' && errObj.statusCode >= 400 && errObj.statusCode < 600) {
+        statusCode = errObj.statusCode;
+      }
+      if (typeof errObj.name === 'string' && errObj.name.trim() !== '') {
+        errorName = errObj.name;
+      }
+      if (typeof errObj.message === 'string' && errObj.message.trim() !== '') {
+        errorMessage = errObj.message;
+      }
+    }
 
     return reply.status(statusCode).send({
       statusCode,
-      error: error.name || 'InternalServerError',
+      error: errorName,
       message: statusCode === 500 && process.env.NODE_ENV === 'production'
         ? 'Internal server error occurred'
-        : error.message || 'An unexpected error occurred',
+        : errorMessage,
       requestId: request.id,
     });
   });
@@ -143,7 +161,11 @@ export function buildServer(): FastifyInstance {
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(new Error(`Origin '${origin}' not allowed by CORS`), false);
+      const err = Object.assign(new Error('Origin not allowed by CORS'), {
+        statusCode: 403,
+        name: 'Forbidden',
+      });
+      return callback(err, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

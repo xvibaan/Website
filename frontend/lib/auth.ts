@@ -18,7 +18,7 @@ const BACKEND_URL = envUrl || "http://127.0.0.1:4000";
 
 export async function getCurrentUser(): Promise<UserRecord | null> {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get("host_market_session")?.value;
 
     if (!token) {

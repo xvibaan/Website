@@ -38,7 +38,7 @@ export async function registerWithAction(formData: FormData) {
       if (setCookie) {
         const tokenMatch = setCookie.match(/host_market_session=([^;]+)/);
         if (tokenMatch && tokenMatch[1]) {
-          cookies().set("host_market_session", tokenMatch[1], {
+          (await cookies()).set("host_market_session", tokenMatch[1], {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",

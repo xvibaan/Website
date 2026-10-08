@@ -1,72 +1,41 @@
 import type { Metadata, ResolvingMetadata } from "next";
-import { api } from "@/lib/api";
+import { getProduct, buildMetadata, productJsonLd, serializeJsonLd, breadcrumbJsonLd, absoluteUrl, productPath } from "@/lib/seo";
 
 export const revalidate = 3600;
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export async function generateMetadata(
   { params }: Props,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const fallbackMetadata: Metadata = {
-    title: "Product Details | Host Market Place",
-    description: "View product details on Host Market Place.",
-    alternates: {
-      canonical: `https://hostmarketplace.store/products/${params.id}`,
-    },
-    openGraph: {
-      title: "Product Details | Host Market Place",
+  const { id } = await params;
+  const previousImages = (await parent).openGraph?.images || [];
+
+  const result = await getProduct(id);
+
+  if (result.status !== "ok") {
+    return buildMetadata({
+      title: "Product Details",
       description: "View product details on Host Market Place.",
-      url: `https://hostmarketplace.store/products/${params.id}`,
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: "Product Details | Host Market Place",
-      description: "View product details on Host Market Place.",
-    },
-  };
-
-  try {
-    // Attempt to fetch product data from the authoritative source
-    const product: any = await api.get(`/api/v1/products/${params.id}`);
-
-    if (!product || !product.id) {
-      return fallbackMetadata;
-    }
-
-    const title = product.name || product.title || "Product Details";
-    const description = product.shortDescription || product.description || "View product details on Host Market Place.";
-    const imageUrl = product.imageUrl || product.image_url;
-
-    const previousImages = (await parent).openGraph?.images || [];
-
-    return {
-      title: title,
-      description: description,
-      alternates: {
-        canonical: `https://hostmarketplace.store/products/${product.slug || params.id}`,
-      },
-      openGraph: {
-        title: `${title} | Host Market Place`,
-        description: description,
-        url: `https://hostmarketplace.store/products/${product.slug || params.id}`,
-        type: "website",
-        images: imageUrl ? [imageUrl, ...previousImages] : previousImages,
-      },
-      twitter: {
-        card: "summary_large_image",
-        title: `${title} | Host Market Place`,
-        description: description,
-        images: imageUrl ? [imageUrl] : [],
-      },
-    };
-  } catch (error) {
-    console.error("Failed to fetch product for metadata:", error);
-    return fallbackMetadata;
+      path: `/products/${id}`,
+      noindex: true,
+      images: previousImages as string[],
+    });
   }
+
+  const { product } = result;
+  const title = product.name || product.title || "Product Details";
+  const description = product.shortDescription || product.description || "View product details on Host Market Place.";
+  const images = typeof product.imageUrl === "string" && product.imageUrl.trim() ? [product.imageUrl.trim(), ...previousImages as string[]] : previousImages as string[];
+
+  return buildMetadata({
+    title,
+    description: description.substring(0, 160),
+    path: productPath(product),
+    images,
+  });
 }
 
 export default async function ProductLayout({
@@ -74,57 +43,39 @@ export default async function ProductLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  let product: any = null;
+  const { id } = await params;
+  const result = await getProduct(id);
 
-  try {
-    product = await api.get(`/api/v1/products/${params.id}`);
-  } catch (error) {
-    // Silent fail for JSON-LD if product not found
+  if (result.status !== "ok") {
+    return <>{children}</>;
   }
 
-  let jsonLd = null;
+  const { product } = result;
+  const jsonLd = productJsonLd(product);
 
-  if (product && product.id) {
-    const title = product.name || product.title || "Product Details";
-    const description = product.shortDescription || product.description || "View product details on Host Market Place.";
-    const imageUrl = product.imageUrl || product.image_url;
-    const url = `https://hostmarketplace.store/products/${product.slug || params.id}`;
-    const price = product.sellingPrice ?? product.price ?? product.basePrice ?? null;
-    const currency = product.currency || "INR";
-
-    const isOutOfStock = product.availability === "OUT_OF_STOCK" || product.status === "DISABLED";
-    const availability = isOutOfStock ? "https://schema.org/OutOfStock" : "https://schema.org/InStock";
-
-    jsonLd = {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      name: title,
-      description: description,
-      url: url,
-      ...(imageUrl && { image: imageUrl }),
-    };
-
-    if (price !== null && price !== undefined) {
-      jsonLd.offers = {
-        "@type": "Offer",
-        price: price.toString(),
-        priceCurrency: currency,
-        availability: availability,
-        url: url,
-      };
-    }
+  const breadcrumbs = [
+    { name: "Home", path: "/" },
+    { name: "Marketplace", path: "/products" },
+  ];
+  if (product.category) {
+    breadcrumbs.push({ name: String(product.category), path: `/products?category=${encodeURIComponent(product.categorySlug || '')}` });
   }
+  breadcrumbs.push({ name: product.name || product.title || "Product", path: productPath(product) });
+
+  const breadcrumbData = breadcrumbJsonLd(breadcrumbs);
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbData) }}
+      />
       {children}
     </>
   );

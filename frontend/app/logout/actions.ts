@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 export async function logoutWithAction() {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.delete("host_market_session");
     cookieStore.set("host_market_session", "", {
       httpOnly: true,
