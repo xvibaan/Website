@@ -1,13 +1,20 @@
-/** @type {import('next').NextConfig} */
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const isProd = process.env.NODE_ENV === 'production';
 const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || '';
+
 let backendOrigin = '';
+
 if (backendApiUrl) {
   try {
     const url = new URL(backendApiUrl);
     backendOrigin = url.origin;
-  } catch(e) {}
+  } catch (e) {
+    // Keep backendOrigin empty if the URL is invalid.
+  }
 }
 
 const scriptSrc = isProd
@@ -35,8 +42,8 @@ const cspHeader = `
 
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   output: 'standalone',
+  outputFileTracingRoot: __dirname,
   async headers() {
     return [
       {
@@ -53,7 +60,7 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          }
+          },
         ],
       },
     ];
