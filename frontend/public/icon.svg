@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Host Market Place</title>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#0b1220"/>
+  <path d="M18 15h28l5 12H13z" fill="#00c2ff"/>
+  <path d="M15 27h34v23H15z" fill="#f8fafc"/>
+  <path d="M12 26h40c0 5-3.2 8-7.2 8-2.8 0-5.2-1.2-7-3.2-1.8 2-4.2 3.2-7.8 3.2s-6-1.2-7.8-3.2c-1.8 2-4.2 3.2-7 3.2-4 0-7.2-3-7.2-8z" fill="#00c2ff"/>
+  <rect x="20" y="38" width="10" height="12" rx="1" fill="#0b1220"/>
+  <rect x="34" y="38" width="10" height="8" rx="1" fill="#bae6fd"/>
+</svg>

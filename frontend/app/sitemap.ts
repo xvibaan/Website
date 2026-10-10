@@ -1,7 +1,37 @@
 import { MetadataRoute } from "next";
+import { LEGAL_PAGES_FINALIZED } from "@/lib/seo";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://hostmarketplace.store";
+
+  const legalEntries: MetadataRoute.Sitemap = LEGAL_PAGES_FINALIZED
+    ? [
+        {
+          url: `${baseUrl}/terms`,
+          lastModified: new Date(),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        },
+        {
+          url: `${baseUrl}/privacy`,
+          lastModified: new Date(),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        },
+        {
+          url: `${baseUrl}/refund-policy`,
+          lastModified: new Date(),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        },
+        {
+          url: `${baseUrl}/contact`,
+          lastModified: new Date(),
+          changeFrequency: "monthly",
+          priority: 0.5,
+        },
+      ]
+    : [];
 
   const staticEntries: MetadataRoute.Sitemap = [
     {
@@ -16,30 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.8,
     },
-    {
-      url: `${baseUrl}/terms`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/refund-policy`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
-    {
-      url: `${baseUrl}/contact`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.5,
-    },
+    ...legalEntries,
   ];
 
   try {
