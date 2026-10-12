@@ -19,6 +19,8 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
   private razorpay: Razorpay;
   private keySecret: string;
   private webhookSecret: string;
+  private isProduction: boolean;
+  private isTestModeKey: boolean;
 
   constructor() {
     const key_id = process.env.RAZORPAY_KEY_ID;
@@ -30,6 +32,8 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     }
 
     const isProd = process.env.NODE_ENV === 'production';
+    this.isProduction = isProd;
+    this.isTestModeKey = key_id.startsWith('rzp_test_');
     if (isProd && key_id.startsWith('rzp_test_')) {
       console.warn('SECURITY WARNING: Test mode Razorpay key ID detected in production environment.');
     }
@@ -45,7 +49,19 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     this.webhookSecret = webhookSecret;
   }
 
+  private assertPaymentOperationsAllowed(): void {
+    if (this.isProduction && this.isTestModeKey) {
+      const err: any = new Error(
+        "Razorpay payments are disabled: Test Mode credentials are configured in production."
+      );
+      err.statusCode = 503;
+      err.name = 'ServiceUnavailable';
+      throw err;
+    }
+  }
+
   async createPayment(params: CreateGatewayPaymentParams): Promise<PaymentIntentResult> {
+    this.assertPaymentOperationsAllowed();
     if (params.currency === 'USDT') {
       throw new Error('Currency USDT is not supported by Razorpay checkout flow.');
     }
@@ -89,6 +105,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     headers: Record<string, string | string[] | undefined>;
     rawBody: Buffer | string;
   }): Promise<WebhookVerificationResult> {
+    this.assertPaymentOperationsAllowed();
     const rawBuffer = Buffer.isBuffer(request.rawBody)
       ? request.rawBody
       : Buffer.from(request.rawBody || '', 'utf8');
@@ -155,6 +172,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
   }
 
   async verifyPayment(gatewayPaymentId: string): Promise<VerifyPaymentResult> {
+    this.assertPaymentOperationsAllowed();
     try {
       const order = await this.razorpay.orders.fetch(gatewayPaymentId);
       
@@ -184,6 +202,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
     paymentId: string;
     signature: string;
   }): Promise<boolean> {
+    this.assertPaymentOperationsAllowed();
     if (!params.orderId || !params.paymentId || !params.signature) {
       return false;
     }
@@ -209,6 +228,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
    * captured status, associated order ID, amount, and currency.
    */
   async fetchPaymentDetails(paymentId: string): Promise<FetchPaymentDetailsResult> {
+    this.assertPaymentOperationsAllowed();
     try {
       let payment = await this.razorpay.payments.fetch(paymentId);
 
@@ -244,6 +264,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
   }
 
   async refundPayment(params: RefundGatewayPaymentParams): Promise<RefundGatewayPaymentResult> {
+    this.assertPaymentOperationsAllowed();
     const amountInPaise = Math.round(parseFloat(params.amount) * 100);
     try {
       // In razorpay, refunds are typically created against a specific payment_id, not order_id.
