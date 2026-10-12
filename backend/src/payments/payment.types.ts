@@ -68,3 +68,17 @@ export interface ProcessWebhookResult {
   message: string;
   paymentTransactionId?: string;
 }
+
+export interface VerifyClientPaymentParams {
+  paymentTransactionId: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
+export interface VerifyClientPaymentResult {
+  success: boolean;
+  status: PaymentStatus;
+  message: string;
+  paymentTransaction: SafePaymentTransaction;
+}

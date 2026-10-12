@@ -123,7 +123,7 @@ export const walletRoutes: FastifyPluginAsync = async (app: FastifyInstance) => 
     // Map only non-completed payment transactions (pending, failed, cancelled)
     // Completed ones are already represented in the ledger
     for (const p of paymentTxnsResult.transactions) {
-      if (p.status.toUpperCase() === 'COMPLETED') continue;
+      if (p.status.toUpperCase() === 'COMPLETED' || p.status.toUpperCase() === 'SUCCESS') continue;
 
       const amountVal = parseFloat(p.amount as string);
 

@@ -6,6 +6,7 @@ import {
   paymentHistoryQuerySchema,
   paymentIdParamSchema,
   webhookParamSchema,
+  verifyPaymentSchema,
 } from '../payment.validation';
 import { rateLimitOverrides } from '../../rate-limit';
 
@@ -56,6 +57,44 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         clientSecret: result.clientSecret,
         gatewayOrderId: result.gatewayOrderId,
       });
+    }
+  );
+
+  /**
+   * POST /api/v1/payments/verify
+   * Customer verifies Razorpay Standard Web Checkout completion.
+   * Cryptographically verifies HMAC-SHA256 signature and authoritative payment status.
+   * Authenticated customer session required.
+   */
+  app.post(
+    '/verify',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const user = request.user;
+      if (!user) {
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          message: 'Authentication required',
+        });
+      }
+
+      const parseResult = verifyPaymentSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: 'BadRequest',
+          message: 'Invalid payment verification parameters',
+          issues: parseResult.error.flatten().fieldErrors,
+        });
+      }
+
+      const result = await paymentTransactionService.verifyClientPayment(
+        parseResult.data,
+        user.userId
+      );
+
+      return reply.status(200).send(result);
     }
   );
 

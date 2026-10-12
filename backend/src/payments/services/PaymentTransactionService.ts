@@ -17,6 +17,8 @@ import {
   SafePaymentTransaction,
   ProcessWebhookResult,
   PaymentStatus,
+  VerifyClientPaymentParams,
+  VerifyClientPaymentResult,
 } from '../payment.types';
 import { settingsAdminService } from '../../admin/services/settings.service';
 import { alertService } from '../../admin/services/alert.service';
@@ -83,7 +85,19 @@ export class PaymentTransactionService {
       throw err;
     }
     const purpose = params.purpose || 'WALLET_RECHARGE';
-    const gatewayId = params.gateway || this.gatewayHub.getDefaultGatewayId();
+
+    // Currency-Aware Payment Routing Guard
+    let gatewayId = params.gateway;
+    if (!gatewayId) {
+      if (currency === 'INR') {
+        gatewayId = 'razorpay';
+      } else {
+        const err: any = new Error(`Payment currency currently unavailable. No active production gateway exists for ${currency}.`);
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+    }
 
     // Verify gateway is supported
     const gateway = this.gatewayHub.getGateway(gatewayId);
@@ -449,6 +463,198 @@ export class PaymentTransactionService {
           paymentTransactionId: lockedTx.id,
         };
       }
+    });
+  }
+
+  /**
+   * Cryptographically verifies Razorpay Standard Checkout completion via client callback.
+   * Enforces customer ownership (IDOR protection), order association, HMAC-SHA256 signature,
+   * authoritative captured status, amount and currency validation, row-level locking, and idempotency.
+   */
+  async verifyClientPayment(
+    params: VerifyClientPaymentParams,
+    currentUserId: string
+  ): Promise<VerifyClientPaymentResult> {
+    // 1. Fetch transaction
+    const transaction = await this.txRepo.findById(params.paymentTransactionId);
+    if (!transaction) {
+      const err: any = new Error('Payment transaction not found');
+      err.statusCode = 404;
+      err.name = 'NotFound';
+      throw err;
+    }
+
+    // 2. Ownership enforcement (IDOR protection)
+    if (transaction.userId !== currentUserId) {
+      const err: any = new Error('Access denied: you do not have permission to verify this payment');
+      err.statusCode = 403;
+      err.name = 'Forbidden';
+      throw err;
+    }
+
+    // 3. Fast check if already SUCCESS (e.g. webhook finished first)
+    if (transaction.status === 'SUCCESS') {
+      return {
+        success: true,
+        status: 'SUCCESS',
+        message: 'Payment already verified and credited',
+        paymentTransaction: this.toSafePaymentTransaction(transaction),
+      };
+    }
+
+    // 4. Reject terminal invalid states
+    if (transaction.status === 'FAILED' || transaction.status === 'CANCELLED') {
+      const err: any = new Error(`Cannot verify payment in terminal ${transaction.status} status`);
+      err.statusCode = 400;
+      err.name = 'BadRequest';
+      throw err;
+    }
+
+    // 5. Require Razorpay order ID to match stored transaction
+    if (transaction.gatewayOrderId && transaction.gatewayOrderId !== params.razorpay_order_id) {
+      const err: any = new Error(
+        `Razorpay order ID mismatch. Expected: '${transaction.gatewayOrderId}', Received: '${params.razorpay_order_id}'`
+      );
+      err.statusCode = 400;
+      err.name = 'BadRequest';
+      throw err;
+    }
+
+    // 6. Resolve gateway
+    const gateway = this.gatewayHub.getGateway(transaction.gateway);
+
+    // 7. Verify Standard Checkout signature using HMAC-SHA256 with timing-safe comparison
+    if (gateway.verifyPaymentSignature) {
+      const isSignatureValid = await gateway.verifyPaymentSignature({
+        orderId: params.razorpay_order_id,
+        paymentId: params.razorpay_payment_id,
+        signature: params.razorpay_signature,
+      });
+
+      if (!isSignatureValid) {
+        alertService.raiseAlert({
+          type: 'WEBHOOK_FAILURE',
+          severity: 'HIGH',
+          message: `Payment signature verification failed for transaction ${transaction.id}`,
+          details: {
+            paymentTransactionId: transaction.id,
+            gatewayOrderId: params.razorpay_order_id,
+            gatewayPaymentId: params.razorpay_payment_id,
+          },
+        }).catch(console.error);
+
+        const err: any = new Error('Invalid payment signature');
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+    }
+
+    // 8. Authoritative gateway status, amount, currency & order verification
+    if (gateway.fetchPaymentDetails) {
+      const details = await gateway.fetchPaymentDetails(params.razorpay_payment_id);
+
+      // Verify order association from authoritative gateway response
+      if (details.orderId && transaction.gatewayOrderId && details.orderId !== transaction.gatewayOrderId) {
+        const err: any = new Error('Authoritative gateway payment is not associated with this order');
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+
+      // Verify captured status
+      if (!details.captured || details.status !== 'captured') {
+        const err: any = new Error(
+          `Payment is not captured. Authoritative status: '${details.status}'`
+        );
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+
+      // Verify amount
+      const normalizedDetailsAmount = Money.format(details.amount);
+      const normalizedStoredAmount = Money.format(transaction.amount);
+      if (normalizedDetailsAmount !== normalizedStoredAmount) {
+        alertService.raiseAlert({
+          type: 'WEBHOOK_FAILURE',
+          severity: 'HIGH',
+          message: `Payment amount mismatch during client verification for transaction ${transaction.id}`,
+          details: { expected: normalizedStoredAmount, received: normalizedDetailsAmount },
+        }).catch(console.error);
+
+        const err: any = new Error(
+          `Payment amount mismatch. Expected: ${normalizedStoredAmount}, Gateway reported: ${normalizedDetailsAmount}`
+        );
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+
+      // Verify currency
+      if (details.currency.toUpperCase() !== transaction.currency.toUpperCase()) {
+        const err: any = new Error(
+          `Payment currency mismatch. Expected: ${transaction.currency}, Gateway reported: ${details.currency}`
+        );
+        err.statusCode = 400;
+        err.name = 'BadRequest';
+        throw err;
+      }
+    }
+
+    // 9. Atomic Transaction with FOR UPDATE lock & Idempotency
+    return withTransaction(async (dbTx: DbTransaction) => {
+      const lockedTx = await this.txRepo.findByIdForUpdate(transaction.id, dbTx);
+      if (!lockedTx) {
+        throw new Error('Transaction disappeared during lock acquisition');
+      }
+
+      if (lockedTx.status === 'SUCCESS') {
+        return {
+          success: true,
+          status: 'SUCCESS',
+          message: 'Payment already verified and credited',
+          paymentTransaction: this.toSafePaymentTransaction(lockedTx),
+        };
+      }
+
+      // Update payment transaction to SUCCESS and record authoritative payment ID
+      const updatedTx = await this.txRepo.updateStatus(
+        lockedTx.id,
+        {
+          status: 'SUCCESS',
+          gatewayPaymentId: params.razorpay_payment_id,
+          completedAt: new Date(),
+        },
+        dbTx
+      );
+
+      // Atomically credit central customer wallet with idempotency key
+      await this.walletService.creditWallet(
+        {
+          userId: lockedTx.userId,
+          amount: lockedTx.amount,
+          currency: lockedTx.currency,
+          referenceType: 'payment',
+          referenceId: lockedTx.id,
+          idempotencyKey: `pay_credit_${lockedTx.id}`,
+          description: `Wallet recharge via ${lockedTx.gateway}`,
+          metadata: JSON.stringify({
+            gateway: lockedTx.gateway,
+            gatewayPaymentId: params.razorpay_payment_id,
+            gatewayOrderId: params.razorpay_order_id,
+            verificationChannel: 'client_verify',
+          }),
+        },
+        dbTx
+      );
+
+      return {
+        success: true,
+        status: 'SUCCESS',
+        message: 'Payment verified and wallet credited successfully',
+        paymentTransaction: this.toSafePaymentTransaction(updatedTx),
+      };
     });
   }
 

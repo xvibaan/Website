@@ -24,8 +24,15 @@ export class PaymentGatewayHub {
     }
 
     // Register razorpay adapter
-    const razorpayGateway = new RazorpayPaymentGateway();
-    this.registerGateway(razorpayGateway);
+    try {
+      const razorpayGateway = new RazorpayPaymentGateway();
+      this.registerGateway(razorpayGateway);
+    } catch (err: any) {
+      if (isProd) {
+        throw err;
+      }
+      console.warn(`[PaymentGatewayHub] Razorpay adapter registration skipped in non-production: ${err.message}`);
+    }
   }
 
   /**

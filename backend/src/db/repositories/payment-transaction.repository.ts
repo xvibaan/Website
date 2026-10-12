@@ -1,4 +1,4 @@
-import { eq, and, desc, count, sql } from 'drizzle-orm';
+import { eq, and, or, desc, count, sql } from 'drizzle-orm';
 import { getDb, DbClient, DbTransaction } from '../client';
 import {
   paymentTransactions,
@@ -71,7 +71,10 @@ export class PaymentTransactionRepository {
       .where(
         and(
           eq(paymentTransactions.gateway, gateway),
-          eq(paymentTransactions.gatewayPaymentId, gatewayPaymentId)
+          or(
+            eq(paymentTransactions.gatewayPaymentId, gatewayPaymentId),
+            eq(paymentTransactions.gatewayOrderId, gatewayPaymentId)
+          )
         )
       )
       .limit(1);

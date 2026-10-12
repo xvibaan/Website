@@ -87,3 +87,10 @@ export const webhookParamSchema = z.object({
     .max(50)
     .regex(/^[a-zA-Z0-9_-]+$/),
 });
+
+export const verifyPaymentSchema = z.object({
+  paymentTransactionId: z.string().uuid('Invalid payment transaction UUID format'),
+  razorpay_order_id: z.string().trim().min(1, 'Razorpay order ID is required'),
+  razorpay_payment_id: z.string().trim().min(1, 'Razorpay payment ID is required'),
+  razorpay_signature: z.string().trim().min(1, 'Razorpay signature is required'),
+});

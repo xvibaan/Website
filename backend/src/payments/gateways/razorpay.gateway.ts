@@ -4,6 +4,7 @@ import {
   IPaymentGateway,
   CreateGatewayPaymentParams,
   VerifyPaymentResult,
+  FetchPaymentDetailsResult,
   RefundGatewayPaymentParams,
   RefundGatewayPaymentResult,
 } from '../interfaces/IPaymentGateway';
@@ -16,6 +17,7 @@ import {
 export class RazorpayPaymentGateway implements IPaymentGateway {
   readonly gatewayId = 'razorpay';
   private razorpay: Razorpay;
+  private keySecret: string;
   private webhookSecret: string;
 
   constructor() {
@@ -27,10 +29,19 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
       throw new Error('CRITICAL CONFIGURATION ERROR: Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET) are missing.');
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && key_id.startsWith('rzp_test_')) {
+      console.warn('SECURITY WARNING: Test mode Razorpay key ID detected in production environment.');
+    }
+    if (!isProd && key_id.startsWith('rzp_live_')) {
+      console.warn('SECURITY WARNING: Live mode Razorpay key ID detected in non-production environment.');
+    }
+
     this.razorpay = new Razorpay({
       key_id,
       key_secret,
     });
+    this.keySecret = key_secret;
     this.webhookSecret = webhookSecret;
   }
 
@@ -47,6 +58,7 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
       amount: amountInPaise,
       currency: params.currency, // e.g. "INR"
       receipt: params.transactionId,
+      payment_capture: 1, // Auto-capture payments upon authorization
       notes: {
         userId: params.userId,
         purpose: params.purpose,
@@ -160,6 +172,74 @@ export class RazorpayPaymentGateway implements IPaymentGateway {
       };
     } catch (error: any) {
       throw new Error(`Razorpay verify payment failed: ${error.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Cryptographically verifies the Razorpay Standard Checkout callback signature
+   * using HMAC-SHA256(order_id + "|" + payment_id, key_secret) with timing-safe comparison.
+   */
+  async verifyPaymentSignature(params: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }): Promise<boolean> {
+    if (!params.orderId || !params.paymentId || !params.signature) {
+      return false;
+    }
+
+    const payload = `${params.orderId}|${params.paymentId}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.keySecret)
+      .update(payload)
+      .digest('hex');
+
+    const sigBuf = Buffer.from(params.signature, 'utf8');
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Directly fetches authoritative payment entity from Razorpay API to verify
+   * captured status, associated order ID, amount, and currency.
+   */
+  async fetchPaymentDetails(paymentId: string): Promise<FetchPaymentDetailsResult> {
+    try {
+      let payment = await this.razorpay.payments.fetch(paymentId);
+
+      // If authorized, attempt server-side capture
+      if (payment.status === 'authorized') {
+        try {
+          const capturedPayment = await this.razorpay.payments.capture(
+            paymentId,
+            payment.amount,
+            payment.currency || 'INR'
+          );
+          payment = capturedPayment;
+        } catch (captureErr) {
+          // If capture call fails, payment retains its current status
+        }
+      }
+
+      const amountString = (Number(payment.amount) / 100).toFixed(2);
+      const isCaptured = payment.status === 'captured';
+
+      return {
+        id: payment.id,
+        orderId: payment.order_id,
+        status: payment.status,
+        amount: amountString,
+        currency: (payment.currency || 'INR').toUpperCase(),
+        captured: isCaptured,
+      };
+    } catch (error: any) {
+      const msg = error?.error?.description || error.message || 'Unknown error';
+      throw new Error(`Razorpay fetch payment details failed: ${msg}`);
     }
   }
 

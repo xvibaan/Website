@@ -19,7 +19,6 @@ import {
   Check,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import QRCode from "qrcode";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigation } from "@/context/NavigationContext";
 import Card3D from "@/components/Card3D";
@@ -31,11 +30,9 @@ export default function DepositPage() {
   const currentBalance = (user as any)?.wallet?.balance || 0.0;
 
   const [amount, setAmount] = useState<number>(500);
-  const [step, setStep] = useState<"AMOUNT" | "PAYMENT" | "RAZORPAY_RESULT">("AMOUNT");
-  const [status, setStatus] = useState<"PENDING" | "VERIFYING" | "SUCCESS" | "FAILED">("PENDING");
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [step, setStep] = useState<"AMOUNT" | "RAZORPAY_RESULT">("AMOUNT");
+  const [status, setStatus] = useState<"PENDING" | "VERIFYING" | "SUCCESS" | "FAILED" | "CANCELLED">("PENDING");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [minDeposit, setMinDeposit] = useState<number>(10);
   const [paymentTxId, setPaymentTxId] = useState<string | null>(null);
 
@@ -58,115 +55,6 @@ export default function DepositPage() {
 
   const currencySymbol = "₹";
   const quickAmounts = [200, 500, 1000, 2500, 5000];
-  const upiId = "hostpanal@upi";
-  const paymentTarget = upiId;
-
-  const generateQRCode = useCallback(async () => {
-    try {
-      const payload = `upi://pay?pa=${upiId}&pn=HostMarketPlace&am=${amount}&cu=INR&tn=HostMarketPlace-Deposit`;
-
-      const url = await QRCode.toDataURL(payload, {
-        width: 600,
-        margin: 2,
-        errorCorrectionLevel: "H",
-        color: {
-          dark: "#000000",
-          light: "#ffffff",
-        },
-      });
-      setQrDataUrl(url);
-    } catch (err) {
-      console.error("Failed to generate QR code:", err);
-    }
-  }, [amount]);
-
-  useEffect(() => {
-    if (step === "PAYMENT") {
-      generateQRCode();
-    }
-  }, [step, generateQRCode]);
-
-  const handleDownloadQR = () => {
-    if (!qrDataUrl) return;
-    setIsDownloading(true);
-    try {
-      // Create offscreen canvas for a high-res branded card for scanning
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const qrImg = new Image();
-
-      qrImg.onload = () => {
-        canvas.width = 640;
-        canvas.height = 760;
-
-        if (ctx) {
-          // Background
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Header border & title
-          ctx.fillStyle = "#0a0c16";
-          ctx.fillRect(0, 0, canvas.width, 90);
-
-          ctx.fillStyle = "#00c2ff";
-          ctx.font = "bold 24px monospace";
-          ctx.textAlign = "center";
-          ctx.fillText("HOST MARKET PLACE", canvas.width / 2, 40);
-
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "14px sans-serif";
-          ctx.fillText("Official Instant Deposit QR Code", canvas.width / 2, 68);
-
-          // Draw QR Image
-          ctx.drawImage(qrImg, 80, 110, 480, 480);
-
-          // Footer info box
-          ctx.fillStyle = "#f3f4f6";
-          ctx.fillRect(40, 610, canvas.width - 80, 110);
-          ctx.strokeStyle = "#e5e7eb";
-          ctx.strokeRect(40, 610, canvas.width - 80, 110);
-
-          ctx.fillStyle = "#111827";
-          ctx.font = "bold 20px monospace";
-          ctx.fillText(`Amount to Pay: ₹${amount}`, canvas.width / 2, 648);
-
-          ctx.fillStyle = "#4b5563";
-          ctx.font = "14px monospace";
-          ctx.fillText(`UPI ID: ${upiId}`, canvas.width / 2, 680);
-
-          ctx.font = "12px sans-serif";
-          ctx.fillStyle = "#9ca3af";
-          ctx.fillText("Scan with any UPI App", canvas.width / 2, 705);
-
-          const finalDataUrl = canvas.toDataURL("image/png");
-          const link = document.createElement("a");
-          link.href = finalDataUrl;
-          link.download = `host-marketplace-deposit-qr-${amount}inr.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-        setIsDownloading(false);
-      };
-
-      qrImg.src = qrDataUrl;
-    } catch {
-      // Fallback to direct QR data URL download
-      const link = document.createElement("a");
-      link.href = qrDataUrl;
-      link.download = `host-marketplace-deposit-qr-${amount}inr.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setIsDownloading(false);
-    }
-  };
-
-  const handleCopyTarget = () => {
-    navigator.clipboard.writeText(paymentTarget);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -181,6 +69,7 @@ export default function DepositPage() {
   const handleProceed = async () => {
     if (amount >= minDeposit) {
       setStatus("VERIFYING");
+      setErrorMessage(null);
       try {
         const res = await api.post("/v1/payments/create", {
           amount: amount.toString(),
@@ -204,10 +93,41 @@ export default function DepositPage() {
           name: "Host Market Place",
           description: "Wallet Deposit",
           order_id: orderId,
-          handler: function (response: any) {
+          handler: async function (response: any) {
              setStep("RAZORPAY_RESULT");
              setStatus("VERIFYING");
-             handleManualVerify(res.paymentTransaction.id);
+             setErrorMessage(null);
+
+             try {
+               const verifyRes = await api.post("/v1/payments/verify", {
+                 paymentTransactionId: res.paymentTransaction.id,
+                 razorpay_order_id: response.razorpay_order_id,
+                 razorpay_payment_id: response.razorpay_payment_id,
+                 razorpay_signature: response.razorpay_signature,
+               });
+
+               if (verifyRes.success && verifyRes.status === "SUCCESS") {
+                 await refreshUser();
+                 setStatus("SUCCESS");
+               } else {
+                 setStatus("FAILED");
+                 setErrorMessage(verifyRes.message || "Payment verification failed.");
+               }
+             } catch (verifyErr: any) {
+               console.error("Payment verification failed:", verifyErr);
+               setStatus("FAILED");
+               setErrorMessage(verifyErr.message || "Cryptographic payment verification failed.");
+             }
+          },
+          modal: {
+            ondismiss: function () {
+              setStatus((current) => {
+                if (current === "SUCCESS" || current === "VERIFYING") return current;
+                setStep("RAZORPAY_RESULT");
+                setErrorMessage("The checkout window was closed before completing payment.");
+                return "CANCELLED";
+              });
+            },
           },
           prefill: {
             email: user?.email || ""
@@ -221,12 +141,14 @@ export default function DepositPage() {
         rzp.on('payment.failed', function (response: any){
           setStep("RAZORPAY_RESULT");
           setStatus("FAILED");
+          setErrorMessage(response?.error?.description || "Payment failed or was declined.");
         });
         rzp.open();
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        setStep("PAYMENT");
-        setStatus("PENDING");
+        setStep("RAZORPAY_RESULT");
+        setStatus("FAILED");
+        setErrorMessage(err.message || "Failed to initiate payment.");
       }
     }
   };
@@ -240,13 +162,18 @@ export default function DepositPage() {
       if (res.paymentTransaction.status === 'SUCCESS') {
          await refreshUser();
          setStatus("SUCCESS");
-      } else if (res.paymentTransaction.status === 'FAILED' || res.paymentTransaction.status === 'CANCELLED') {
+      } else if (res.paymentTransaction.status === 'FAILED') {
          setStatus("FAILED");
+         setErrorMessage(res.paymentTransaction.failureReason || "Transaction reported failed.");
+      } else if (res.paymentTransaction.status === 'CANCELLED') {
+         setStatus("CANCELLED");
+         setErrorMessage("Transaction was cancelled.");
       } else {
          setStatus("PENDING");
       }
-    } catch {
+    } catch (e: any) {
       setStatus("FAILED");
+      setErrorMessage(e.message || "Status check failed.");
     }
   };
 
@@ -322,7 +249,7 @@ export default function DepositPage() {
                 <div className="pt-6 border-t border-white/[0.08] text-[11px] font-mono text-gray-400 space-y-1">
                   <div className="flex justify-between">
                     <span>Gateway:</span>
-                    <span className="text-white">Instant UPI (India)</span>
+                    <span className="text-white">Razorpay (India)</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Account:</span>
@@ -385,120 +312,9 @@ export default function DepositPage() {
                     disabled={amount < minDeposit}
                     className="w-full py-3.5 min-h-[48px] bg-primary hover:bg-primary-hover text-black font-bold text-xs uppercase tracking-wider rounded-2xl transition-colors shadow-[0_0_20px_rgba(0,194,255,0.25)] hover:shadow-[0_0_25px_rgba(0,194,255,0.4)] disabled:opacity-50 flex items-center justify-center gap-2 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
                   >
-                    <span>Generate Secure Payment QR</span>
+                    <span>Proceed to Secure Payment</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
-                </motion.div>
-              ) : step === "PAYMENT" ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center text-center space-y-6"
-                >
-                  <div>
-                    <h2 className="text-xl font-bold text-white tracking-tight">
-                      Scan QR Code to Pay ₹{amount}
-                    </h2>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Scan with any UPI app on your phone
-                    </p>
-                  </div>
-
-                  {/* QR Code Presentation */}
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="relative w-64 h-64 bg-white p-4 rounded-2xl shadow-2xl flex items-center justify-center border border-white/20">
-                      {qrDataUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img
-                          src={qrDataUrl}
-                          alt={`QR Code to pay ₹${amount} via UPI`}
-                          className="w-full h-full object-contain rounded-lg"
-                        />
-                      ) : (
-                        <QrCode className="w-full h-full text-black animate-pulse" />
-                      )}
-
-                      {status === "SUCCESS" && (
-                        <div className="absolute inset-0 bg-emerald-600/95 rounded-2xl flex flex-col items-center justify-center text-white p-4 backdrop-blur-sm">
-                          <CheckCircle className="w-16 h-16 mb-2" />
-                          <p className="font-bold text-sm tracking-wide">PAYMENT CONFIRMED</p>
-                          <p className="text-[11px] opacity-80 mt-1">Funds credited to wallet</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Download & Copy Buttons */}
-                    <div className="flex flex-wrap items-center justify-center gap-2 w-full max-w-xs">
-                      <button
-                        type="button"
-                        onClick={handleDownloadQR}
-                        disabled={!qrDataUrl || isDownloading}
-                        className="flex-1 py-2.5 px-3 min-h-[44px] rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs font-mono font-bold transition-all shadow-[0_0_12px_rgba(0,194,255,0.15)] flex items-center justify-center gap-2 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
-                      >
-                        <Download className="w-4 h-4 shrink-0" />
-                        <span>{isDownloading ? "Downloading..." : "Download QR Code"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCopyTarget}
-                        className="py-2.5 px-3 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-xs font-mono transition-colors flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
-                        title="Copy UPI ID"
-                      >
-                        {isCopied ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span className="text-emerald-400">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 shrink-0" />
-                            <span>Copy UPI</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="w-full max-w-sm space-y-4">
-                    {status === "FAILED" && (
-                      <div className="p-3 border border-red-500/30 bg-red-500/10 text-red-400 text-xs flex items-center justify-center gap-2 rounded-xl">
-                        <AlertTriangle className="w-4 h-4" /> Verification pending. Try checking again.
-                      </div>
-                    )}
-
-                    <p className="text-xs text-gray-400 leading-relaxed">
-                      Continuous background listener is active. <br />
-                      <span className="text-primary font-semibold">Instant auto-credit upon receipt.</span>
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => handleManualVerify()}
-                      disabled={status === "VERIFYING" || status === "SUCCESS"}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/15 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/60 outline-none"
-                    >
-                      {status === "VERIFYING" ? (
-                        <>
-                          <RefreshCcw className="w-4 h-4 animate-spin text-primary" />
-                          <span>Verifying with Payment Switch...</span>
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCcw className="w-4 h-4 text-primary" />
-                          <span>Check Payment Status</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStep("AMOUNT")}
-                      className="text-xs text-gray-500 hover:text-white underline underline-offset-4 font-mono block mx-auto focus-visible:ring-2 focus-visible:ring-primary/60 rounded outline-none p-1"
-                    >
-                      Cancel / Change Amount
-                    </button>
-                  </div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -513,17 +329,23 @@ export default function DepositPage() {
                         <h2 className="text-xl font-bold text-white mb-2">Payment Successful</h2>
                         <p className="text-xs text-gray-400">Your wallet has been credited.</p>
                       </div>
+                    ) : status === "CANCELLED" ? (
+                      <div className="flex flex-col items-center text-amber-400">
+                        <AlertTriangle className="w-16 h-16 mb-4" />
+                        <h2 className="text-xl font-bold text-white mb-2">Payment Cancelled</h2>
+                        <p className="text-xs text-gray-400">{errorMessage || "The checkout window was closed before completion."}</p>
+                      </div>
                     ) : status === "FAILED" ? (
                       <div className="flex flex-col items-center text-red-400">
                         <AlertTriangle className="w-16 h-16 mb-4" />
                         <h2 className="text-xl font-bold text-white mb-2">Payment Failed</h2>
-                        <p className="text-xs text-gray-400">The transaction could not be completed.</p>
+                        <p className="text-xs text-gray-400">{errorMessage || "The transaction could not be completed."}</p>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center text-primary">
                         <RefreshCcw className="w-16 h-16 mb-4 animate-spin" />
                         <h2 className="text-xl font-bold text-white mb-2">Verifying Payment</h2>
-                        <p className="text-xs text-gray-400">Please wait while we verify your transaction...</p>
+                        <p className="text-xs text-gray-400">Cryptographically verifying transaction with server...</p>
                       </div>
                     )}
                   </div>

@@ -3,6 +3,7 @@ import {
   IPaymentGateway,
   CreateGatewayPaymentParams,
   VerifyPaymentResult,
+  FetchPaymentDetailsResult,
   RefundGatewayPaymentParams,
   RefundGatewayPaymentResult,
 } from '../interfaces/IPaymentGateway';
@@ -26,12 +27,10 @@ import {
 export class DevelopmentPaymentGateway implements IPaymentGateway {
   readonly gatewayId = 'dev-gateway';
   private secret: string;
+  private mockPayments = new Map<string, { id: string; orderId: string; amount: string; currency: string; status: string; captured: boolean }>();
 
   constructor(secret?: string) {
-    const finalSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (!finalSecret) {
-      throw new Error('CRITICAL CONFIGURATION ERROR: Webhook secret is required for DevelopmentPaymentGateway.');
-    }
+    const finalSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET || 'dev_test_secret_for_mock_gateway';
     this.secret = finalSecret;
   }
 
@@ -50,6 +49,17 @@ export class DevelopmentPaymentGateway implements IPaymentGateway {
     this.assertNonProduction();
     const gatewayPaymentId = `dev_pay_${params.transactionId.replace(/-/g, '').slice(0, 16)}`;
     const gatewayOrderId = `dev_ord_${Date.now()}`;
+
+    const paymentInfo = {
+      id: gatewayPaymentId,
+      orderId: gatewayOrderId,
+      amount: params.amount,
+      currency: params.currency || 'INR',
+      status: 'captured',
+      captured: true,
+    };
+    this.mockPayments.set(gatewayPaymentId, paymentInfo);
+    this.mockPayments.set(gatewayOrderId, paymentInfo);
 
     return {
       gatewayPaymentId,
@@ -196,5 +206,71 @@ export class DevelopmentPaymentGateway implements IPaymentGateway {
       .update(Buffer.from(rawBody, 'utf8'))
       .digest('hex');
     return { signature };
+  }
+
+  /**
+   * Cryptographically verifies checkout callback signature using HMAC-SHA256 with timing-safe comparison.
+   */
+  async verifyPaymentSignature(params: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }): Promise<boolean> {
+    this.assertNonProduction();
+    if (!params.orderId || !params.paymentId || !params.signature) {
+      return false;
+    }
+
+    const payload = `${params.orderId}|${params.paymentId}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.secret)
+      .update(payload)
+      .digest('hex');
+
+    const sigBuf = Buffer.from(params.signature, 'utf8');
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Authoritative lookup of mock payment details.
+   */
+  async fetchPaymentDetails(paymentId: string): Promise<FetchPaymentDetailsResult> {
+    this.assertNonProduction();
+    const stored = this.mockPayments.get(paymentId);
+    if (stored) {
+      return {
+        id: stored.id,
+        orderId: stored.orderId,
+        status: stored.status,
+        amount: stored.amount,
+        currency: stored.currency,
+        captured: stored.captured,
+      };
+    }
+
+    // Default mock response
+    return {
+      id: paymentId,
+      orderId: '',
+      status: 'captured',
+      amount: '10.00',
+      currency: 'INR',
+      captured: true,
+    };
+  }
+
+  /**
+   * Helper to sign checkout parameters for testing.
+   */
+  signCheckoutPayload(orderId: string, paymentId: string): string {
+    return crypto
+      .createHmac('sha256', this.secret)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
   }
 }

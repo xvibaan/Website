@@ -36,7 +36,7 @@ const cspHeader = [
   "style-src 'self' 'unsafe-inline';",
   "img-src " + imgSrc + ";",
   "connect-src " + connectSrc + ";",
-  "frame-src 'self' https://api.razorpay.com;",
+  "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;",
   "object-src 'none';",
   "base-uri 'self';",
   "form-action 'self';",

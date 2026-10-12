@@ -30,6 +30,15 @@ export interface RefundGatewayPaymentResult {
   status: 'SUCCESS' | 'FAILED' | 'PENDING';
 }
 
+export interface FetchPaymentDetailsResult {
+  id: string;
+  orderId: string;
+  status: string;
+  amount: string;
+  currency: string;
+  captured: boolean;
+}
+
 /**
  * Universal Payment Gateway Interface.
  *
@@ -57,6 +66,20 @@ export interface IPaymentGateway {
    * Directly queries gateway API for transaction status (for reconciliation).
    */
   verifyPayment(gatewayPaymentId: string): Promise<VerifyPaymentResult>;
+
+  /**
+   * Verifies standard checkout payment callback signature using HMAC-SHA256.
+   */
+  verifyPaymentSignature?(params: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }): Promise<boolean>;
+
+  /**
+   * Fetches authoritative payment details directly from gateway API.
+   */
+  fetchPaymentDetails?(paymentId: string): Promise<FetchPaymentDetailsResult>;
 
   /**
    * Optional refund capability.
