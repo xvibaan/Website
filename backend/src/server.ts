@@ -13,6 +13,7 @@ import { authRoutes } from './auth/auth.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { walletRoutes } from './wallet/wallet.routes';
 import { paymentRoutes } from './payments/routes/payment.routes';
+import { famappRoutes, famappAdminRoutes, famappScheduler } from './payments/famapp';
 import { providerRoutes } from './providers/routes/provider.routes';
 import { providerRegistry } from './providers/registry/ProviderRegistry';
 import { DevelopmentProviderAdapter } from './providers/adapters/development/DevelopmentProviderAdapter';
@@ -216,6 +217,9 @@ export function buildServer(): FastifyInstance {
 
   // Central Payment Gateway & Webhook API Routes
   app.register(paymentRoutes, { prefix: '/api/v1/payments' });
+  // FamApp Static UPI QR & Gmail Payment Verification Routes
+  app.register(famappRoutes, { prefix: '/api/v1/payments/famapp' });
+  app.register(famappAdminRoutes, { prefix: '/api/v1/admin/payments/famapp' });
 
   // Protected Master Admin API Routes (RBAC Boundary, Providers, Products, Customers, Analytics, Settings)
   app.register(adminRoutes, { prefix: '/api/v1/admin' });
