@@ -81,3 +81,11 @@ export async function closeDbPool(): Promise<void> {
 }
 
 export { schema };
+
+
+/**
+ * Test helper: overrides the Drizzle db instance for isolated implementation-level testing.
+ */
+export function setDbForTesting(mockDb: any): void {
+  dbInstance = mockDb;
+}

@@ -7,6 +7,7 @@ import { productProviderOffers } from '../db/schema/product-provider-offers';
 import { productVariants } from '../db/schema/product-variants';
 import { categories } from '../db/schema/categories';
 import { orders, Order, NewOrder, NewOrderItem, orderItems } from '../db/schema/orders';
+import { productDigitalFiles } from '../db/schema/product-digital-files';
 import { eq, and, inArray, asc } from 'drizzle-orm';
 import { providerRegistry } from '../providers/registry/ProviderRegistry';
 import { providerResolver } from '../providers/services/ProviderResolver';
@@ -613,28 +614,91 @@ export class OrderService {
     const orders = await orderRepository.findOrdersByUserId(userId);
     const result = [];
 
+    // Pre-fetch items and collect product IDs for completed and successfully paid orders
+    const itemsByOrderId = new Map<number, any[]>();
+    const completedProductIds = new Set<string>();
+
     for (const order of orders) {
       const items = await orderRepository.findOrderItemsByOrderId(order.id);
+      itemsByOrderId.set(order.id, items);
 
-      const mappedItems = items.map((item) => ({
-        id: item.id,
-        productNameSnapshot: item.productNameSnapshot,
-        product_name_snapshot: item.productNameSnapshot,
-        variantNameSnapshot: item.variantNameSnapshot,
-        variant_name_snapshot: item.variantNameSnapshot,
-        priceAtPurchase: Number(item.priceAtPurchase),
-        price_at_purchase: Number(item.priceAtPurchase),
-        faceValue: Number(item.faceValue || item.priceAtPurchase),
-        face_value: Number(item.faceValue || item.priceAtPurchase),
-        discountPercent: item.discountPercent || 0,
-        discount_percent: item.discountPercent || 0,
-        category: item.categorySnapshot,
-        categorySnapshot: item.categorySnapshot,
-        fulfillmentStatus: item.fulfillmentStatus,
-        fulfillment_status: item.fulfillmentStatus,
-        quantity: item.quantity,
-        product_key: item.deliveredKey ? { key_value: item.deliveredKey } : undefined,
-      }));
+      if (order.status === 'COMPLETED' && order.paymentStatus === 'SUCCESSFUL') {
+        for (const item of items) {
+          if (item.productId) {
+            completedProductIds.add(item.productId);
+          }
+        }
+      }
+    }
+
+    // Batch-query READY digital files for all completed products
+    const filesByProductId = new Map<string, Array<{ id: string; filename: string; mimeType: string; sizeBytes: number; status: string }>>();
+    if (completedProductIds.size > 0) {
+      const db = getDb();
+      const readyFiles = await db
+        .select({
+          id: productDigitalFiles.id,
+          productId: productDigitalFiles.productId,
+          filename: productDigitalFiles.originalFilename,
+          mimeType: productDigitalFiles.mimeType,
+          sizeBytes: productDigitalFiles.sizeBytes,
+          status: productDigitalFiles.status,
+        })
+        .from(productDigitalFiles)
+        .where(
+          and(
+            inArray(productDigitalFiles.productId, Array.from(completedProductIds)),
+            eq(productDigitalFiles.status, 'READY'),
+            eq(productDigitalFiles.storageDriver, 'r2'),
+          ),
+        );
+
+      for (const file of readyFiles) {
+        const list = filesByProductId.get(file.productId) || [];
+        list.push({
+          id: file.id,
+          filename: file.filename,
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          status: file.status,
+        });
+        filesByProductId.set(file.productId, list);
+      }
+    }
+
+    for (const order of orders) {
+      const items = itemsByOrderId.get(order.id) || [];
+      const isEntitled = order.status === 'COMPLETED' && order.paymentStatus === 'SUCCESSFUL';
+
+      const mappedItems = items.map((item) => {
+        const digitalFiles = (isEntitled && item.productId)
+          ? filesByProductId.get(item.productId) || []
+          : [];
+
+        return {
+          id: item.id,
+          productId: item.productId,
+          product_id: item.productId,
+          productNameSnapshot: item.productNameSnapshot,
+          product_name_snapshot: item.productNameSnapshot,
+          variantNameSnapshot: item.variantNameSnapshot,
+          variant_name_snapshot: item.variantNameSnapshot,
+          priceAtPurchase: Number(item.priceAtPurchase),
+          price_at_purchase: Number(item.priceAtPurchase),
+          faceValue: Number(item.faceValue || item.priceAtPurchase),
+          face_value: Number(item.faceValue || item.priceAtPurchase),
+          discountPercent: item.discountPercent || 0,
+          discount_percent: item.discountPercent || 0,
+          category: item.categorySnapshot,
+          categorySnapshot: item.categorySnapshot,
+          fulfillmentStatus: item.fulfillmentStatus,
+          fulfillment_status: item.fulfillmentStatus,
+          quantity: item.quantity,
+          product_key: item.deliveredKey ? { key_value: item.deliveredKey } : undefined,
+          digitalFiles,
+          digital_files: digitalFiles,
+        };
+      });
 
       result.push({
         id: order.id,

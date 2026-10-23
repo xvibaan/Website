@@ -27,6 +27,9 @@ import {
   Tag,
   Server,
   FileText,
+  HardDrive,
+  ShieldAlert,
+  FileDown,
 } from "lucide-react";
 
 interface VariantItem {
@@ -70,7 +73,19 @@ interface ProviderOption {
   code: string;
 }
 
-type TabType = "basic" | "media" | "details" | "variants" | "pricing" | "resources";
+interface DigitalFileItem {
+  id: string;
+  productId: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: "PENDING_UPLOAD" | "READY" | "FAILED" | "DELETING" | string;
+  uploadedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type TabType = "basic" | "media" | "details" | "variants" | "pricing" | "resources" | "digital-files";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -89,6 +104,48 @@ export default function ProductDetailPage() {
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [providers, setProviders] = useState<ProviderOption[]>([]);
+
+  // Tab 7: Digital Files State (Cloudflare R2)
+  const [digitalFiles, setDigitalFiles] = useState<DigitalFileItem[]>([]);
+  const [digitalFilesLoading, setDigitalFilesLoading] = useState(false);
+  const [digitalFilesError, setDigitalFilesError] = useState<string | null>(null);
+  const [completedOrdersCount, setCompletedOrdersCount] = useState<number>(0);
+
+  const [selectedDigitalFile, setSelectedDigitalFile] = useState<File | null>(null);
+  const [uploadingStage, setUploadingStage] = useState<
+    "idle" | "initiating" | "uploading" | "completing" | "success" | "error"
+  >("idle");
+  const [uploadProgressText, setUploadProgressText] = useState("");
+  const [uploadErrorMessage, setUploadErrorMessage] = useState<string | null>(null);
+
+  // Tab 7: Deletion Modal State
+  const [deleteFileModal, setDeleteFileModal] = useState<{
+    isOpen: boolean;
+    file: DigitalFileItem | null;
+  }>({ isOpen: false, file: null });
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
+  const [deleteFileError, setDeleteFileError] = useState<string | null>(null);
+
+  const fetchDigitalFiles = useCallback(async () => {
+    if (!productId) return;
+    setDigitalFilesLoading(true);
+    setDigitalFilesError(null);
+    try {
+      const res = await adminApi.getProductDigitalFiles(productId);
+      if (res?.success && Array.isArray(res.data)) {
+        setDigitalFiles(res.data);
+      }
+      if (typeof res?.completedOrdersCount === "number") {
+        setCompletedOrdersCount(res.completedOrdersCount);
+      }
+    } catch (err: any) {
+      console.error("Failed to load digital files:", err);
+      setDigitalFilesError(err?.message || "Failed to load digital files from backend.");
+    } finally {
+      setDigitalFilesLoading(false);
+    }
+  }, [productId]);
+
 
   // Tab 1: Basic Info Form State
   const [basicName, setBasicName] = useState("");
@@ -212,6 +269,8 @@ export default function ProductDetailPage() {
 
         // Populate Resources
         setResources(Array.isArray(p.resources) ? p.resources : []);
+
+
       }
 
       if (catsRes?.categories) setCategories(catsRes.categories);
@@ -226,7 +285,10 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     fetchProductData();
-  }, [fetchProductData]);
+    if (productId) {
+      fetchDigitalFiles();
+    }
+  }, [fetchProductData, fetchDigitalFiles, productId]);
 
   // Discount calculation helper
   const calculateDiscount = (origStr: string, sellStr: string) => {
@@ -249,6 +311,169 @@ export default function ProductDetailPage() {
     }
   };
 
+  useEffect(() => {
+    if (activeTab === "digital-files" && productId) {
+      fetchDigitalFiles();
+    }
+  }, [activeTab, productId, fetchDigitalFiles]);
+
+  // Tab 7: Digital Files Handlers & Formatters
+  const ALLOWED_DIGITAL_EXTS: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".epub": "application/epub+zip",
+    ".zip": "application/zip",
+    ".apk": "application/vnd.android.package-archive",
+  };
+
+  const resolveDigitalMime = (file: File): string | null => {
+    const name = file.name.toLowerCase();
+    const dot = name.lastIndexOf(".");
+    if (dot === -1) return null;
+    const ext = name.slice(dot);
+    return ALLOWED_DIGITAL_EXTS[ext] || null;
+  };
+
+  const formatByteSize = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+
+
+  const handleDigitalFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setUploadErrorMessage(null);
+    if (!file) {
+      setSelectedDigitalFile(null);
+      return;
+    }
+
+    const mime = resolveDigitalMime(file);
+    if (!mime) {
+      setUploadErrorMessage("Unsupported format. Allowed formats: PDF (.pdf), EPUB (.epub), ZIP (.zip), APK (.apk)");
+      setSelectedDigitalFile(null);
+      return;
+    }
+
+    const maxBytes = 100 * 1024 * 1024; // 100 MiB
+    if (file.size > maxBytes) {
+      setUploadErrorMessage("File size exceeds 100 MiB limit.");
+      setSelectedDigitalFile(null);
+      return;
+    }
+
+    setSelectedDigitalFile(file);
+  };
+
+  const handleUploadDigitalFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDigitalFile || !productId) return;
+
+    const mimeType = resolveDigitalMime(selectedDigitalFile);
+    if (!mimeType) {
+      setUploadErrorMessage("Unsupported format. Allowed: .pdf, .epub, .zip, .apk");
+      return;
+    }
+
+    const maxBytes = 100 * 1024 * 1024;
+    if (selectedDigitalFile.size <= 0 || selectedDigitalFile.size > maxBytes) {
+      setUploadErrorMessage("File size must be between 1 byte and 100 MiB.");
+      return;
+    }
+
+    setUploadingStage("initiating");
+    setUploadProgressText("Requesting presigned upload URL from backend...");
+    setUploadErrorMessage(null);
+
+    try {
+      // Step 1: Initiate via Next.js proxy -> Fastify backend
+      const initRes = await adminApi.initiateDigitalFileUpload({
+        productId,
+        filename: selectedDigitalFile.name,
+        mimeType,
+        sizeBytes: selectedDigitalFile.size,
+      });
+
+      if (!initRes?.success || !initRes?.uploadUrl || !initRes?.fileId) {
+        throw new Error(initRes?.status || "Failed to initiate digital file upload.");
+      }
+
+      // Step 2: Direct browser-to-Cloudflare-R2 PUT upload (bypasses Next.js proxy)
+      setUploadingStage("uploading");
+      setUploadProgressText("Uploading file directly to private Cloudflare R2 storage...");
+
+      const headers: Record<string, string> = {
+        ...initRes.requiredHeaders,
+      };
+      if (!headers["Content-Type"]) {
+        headers["Content-Type"] = mimeType;
+      }
+
+      const r2Res = await fetch(initRes.uploadUrl, {
+        method: "PUT",
+        headers,
+        body: selectedDigitalFile,
+      });
+
+      if (!r2Res.ok) {
+        throw new Error(`Direct storage upload failed with status ${r2Res.status} (${r2Res.statusText})`);
+      }
+
+      // Step 3: Complete upload on backend (verifies ETag, promotes staging to final, sets READY)
+      setUploadingStage("completing");
+      setUploadProgressText("Verifying upload integrity and promoting object in R2...");
+
+      const compRes = await adminApi.completeDigitalFileUpload(initRes.fileId);
+
+      if (!compRes?.success || compRes.status !== "READY") {
+        throw new Error(`Upload completion returned status: ${compRes?.status || "UNKNOWN"}`);
+      }
+
+      // Step 4: Success confirmation
+      setUploadingStage("success");
+      setUploadProgressText("Upload complete and verified!");
+      setActionSuccess(`Digital file '${selectedDigitalFile.name}' uploaded and verified successfully.`);
+      setSelectedDigitalFile(null);
+
+      const fileInput = document.getElementById("digitalFileInput") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+
+      await fetchDigitalFiles();
+      setTimeout(() => {
+        setUploadingStage("idle");
+        setUploadProgressText("");
+        setActionSuccess(null);
+      }, 4000);
+    } catch (err: any) {
+      console.error("Digital file upload failed:", err);
+      setUploadingStage("error");
+      setUploadErrorMessage(err?.message || "Failed to upload digital file.");
+    }
+  };
+
+
+  const handleDeleteDigitalFile = async () => {
+    if (!deleteFileModal.file) return;
+    setIsDeletingFile(true);
+    setDeleteFileError(null);
+    try {
+      const res = await adminApi.deleteProductDigitalFile(deleteFileModal.file.id);
+      if (res?.success) {
+        setActionSuccess("Digital file '" + deleteFileModal.file.originalFilename + "' removed successfully.");
+        setDeleteFileModal({ isOpen: false, file: null });
+        await fetchDigitalFiles();
+        setTimeout(() => setActionSuccess(null), 3500);
+      }
+    } catch (err: any) {
+      console.error("Failed to delete digital file:", err);
+      setDeleteFileError(err?.message || "Failed to delete digital file.");
+    } finally {
+      setIsDeletingFile(false);
+    }
+  };
   // Save Tab 1: Basic Info
   const handleSaveBasicInfo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -765,6 +990,7 @@ export default function ProductDetailPage() {
           { key: "variants", label: `Variants & Plans (${variants.length})`, icon: Layers },
           { key: "pricing", label: "Pricing & Economics", icon: DollarSign },
           { key: "resources", label: `Resources (${resources.length})`, icon: FileText },
+          { key: "digital-files", label: "Digital Files (" + digitalFiles.length + ")", icon: HardDrive },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -1905,6 +2131,294 @@ export default function ProductDetailPage() {
                   >
                     Save Resource
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 7: DIGITAL FILES (CLOUDFLARE R2) */}
+      {activeTab === "digital-files" && (
+        <div className="space-y-6">
+          {/* Header & Status Card */}
+          <div className="p-5 rounded-2xl bg-[#0b0e17] border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-5 h-5 text-[#00c2ff]" />
+                <h3 className="text-sm font-bold text-white">Private Digital Files (Cloudflare R2)</h3>
+              </div>
+              <p className="text-xs text-gray-400 max-w-2xl">
+                Deliver private digital files (PDF guides, EPUBs, ZIP archives, APK binaries) directly to entitled buyers.
+                Uploads stream directly from the browser to Cloudflare R2, bypassing all intermediary API servers.
+              </p>
+            </div>
+            {completedOrdersCount > 0 ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs shrink-0">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{completedOrdersCount} Customer Order{completedOrdersCount > 1 ? "s" : ""} Active (Protected)</span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-500 font-mono">No customer purchases yet</span>
+            )}
+          </div>
+
+          {/* Upload Widget */}
+          <div className="p-5 rounded-2xl bg-[#0b0e17] border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Upload New Digital File</h4>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Allowed: PDF (.pdf), EPUB (.epub), ZIP (.zip), Android Package (.apk) &bull; Maximum size: 100 MiB
+                </p>
+              </div>
+              {uploadingStage !== "idle" && uploadingStage !== "error" && uploadingStage !== "success" && (
+                <div className="flex items-center gap-2 text-xs text-[#00c2ff]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="font-mono">{uploadProgressText}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleUploadDigitalFile} className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <input
+                  id="digitalFileInput"
+                  type="file"
+                  accept=".pdf,.epub,.zip,.apk"
+                  onChange={handleDigitalFileSelect}
+                  disabled={uploadingStage !== "idle" && uploadingStage !== "error" && uploadingStage !== "success"}
+                  className="block w-full sm:w-auto text-xs text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border file:border-white/10 file:text-xs file:font-semibold file:bg-white/5 file:text-white hover:file:bg-white/10 file:transition-colors cursor-pointer"
+                />
+
+                {selectedDigitalFile && (
+                  <span className="text-xs text-emerald-400 font-mono">
+                    {formatByteSize(selectedDigitalFile.size)} selected
+                  </span>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!selectedDigitalFile || (uploadingStage !== "idle" && uploadingStage !== "error" && uploadingStage !== "success")}
+                  className="px-4 py-2 rounded-xl bg-[#00c2ff] hover:bg-[#00c2ff]/90 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold transition-all flex items-center gap-2 shrink-0 ml-auto"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{uploadingStage === "uploading" ? "Uploading to R2..." : "Start Upload"}</span>
+                </button>
+              </div>
+
+              {uploadErrorMessage && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{uploadErrorMessage}</span>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Files List Table */}
+          <div className="p-5 rounded-2xl bg-[#0b0e17] border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                Attached Digital Files ({digitalFiles.length})
+              </h4>
+              <button
+                type="button"
+                onClick={fetchDigitalFiles}
+                disabled={digitalFilesLoading}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                title="Refresh Files"
+              >
+                <RefreshCw className={"w-3.5 h-3.5 " + (digitalFilesLoading ? "animate-spin" : "")} />
+              </button>
+            </div>
+
+            {digitalFilesLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-gray-400">
+                <Loader2 className="w-6 h-6 animate-spin text-[#00c2ff]" />
+                <span className="text-xs font-mono">Loading digital assets...</span>
+              </div>
+            ) : digitalFilesError ? (
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{digitalFilesError}</span>
+              </div>
+            ) : digitalFiles.length === 0 ? (
+              <div className="py-12 border border-dashed border-white/10 rounded-xl text-center space-y-2">
+                <FileDown className="w-8 h-8 text-gray-500 mx-auto" />
+                <p className="text-xs font-semibold text-gray-300">No Digital Files Attached</p>
+                <p className="text-[11px] text-gray-500 max-w-md mx-auto">
+                  Upload PDF manuals, game assets, EPUBs, or APK binaries above. When customers purchase this product, they will receive authenticated access to download these files.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-white/10 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-white/[0.02] border-b border-white/10 text-[10px] font-mono uppercase text-gray-400">
+                    <tr>
+                      <th className="py-3 px-3">File Name</th>
+                      <th className="py-3 px-3">MIME Type</th>
+                      <th className="py-3 px-3">Size</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-3">Uploaded</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {digitalFiles.map((file) => {
+                      const isReady = file.status === "READY";
+                      const isPending = file.status === "PENDING_UPLOAD";
+                      const isFailed = file.status === "FAILED";
+                      const isDeleting = file.status === "DELETING";
+
+                      return (
+                        <tr key={file.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-[#00c2ff] shrink-0" />
+                            <span className="truncate max-w-xs">{file.originalFilename}</span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px] text-gray-400">
+                            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                              {file.mimeType}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-gray-300 text-xs">
+                            {formatByteSize(file.sizeBytes)}
+                          </td>
+                          <td className="py-3 px-3">
+                            {isReady && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 className="w-3 h-3" /> READY
+                              </span>
+                            )}
+                            {isPending && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                                <Loader2 className="w-3 h-3 animate-spin" /> PENDING
+                              </span>
+                            )}
+                            {isFailed && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+                                <AlertCircle className="w-3 h-3" /> FAILED
+                              </span>
+                            )}
+                            {isDeleting && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                                <Loader2 className="w-3 h-3 animate-spin" /> DELETING
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-gray-400 text-[11px] font-mono">
+                            {file.uploadedAt ? new Date(file.uploadedAt).toLocaleString() : file.createdAt ? new Date(file.createdAt).toLocaleString() : "N/A"}
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteFileError(null);
+                                setDeleteFileModal({ isOpen: true, file });
+                              }}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-white/5 transition-colors"
+                              title="Delete Digital File"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Delete Confirmation Modal */}
+          {deleteFileModal.isOpen && deleteFileModal.file && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[#0b0e17] border border-white/15 max-w-md w-full rounded-2xl p-5 space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <h3 className="text-sm font-bold text-white">Delete Digital Deliverable</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteFileModal({ isOpen: false, file: null });
+                      setDeleteFileError(null);
+                    }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <p className="text-gray-300">
+                    Are you sure you want to remove <span className="font-semibold text-white">&quot;{deleteFileModal.file.originalFilename}&quot;</span>?
+                  </p>
+
+                  {completedOrdersCount > 0 && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <ShieldAlert className="w-4 h-4 shrink-0" />
+                        <span>Entitlement Warning</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                        This product has {completedOrdersCount} completed customer order{completedOrdersCount > 1 ? "s" : ""}.
+                        Permanently deleting this file will revoke download access for existing buyers.
+                        If you are updating this product, upload the replacement file before removing the old version.
+                      </p>
+                    </div>
+                  )}
+
+                  {deleteFileError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Deletion Blocked</span>
+                      </div>
+                      <p className="text-[11px]">{deleteFileError}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                  {completedOrdersCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteFileModal({ isOpen: false, file: null });
+                        setDeleteFileError(null);
+                      }}
+                      className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-colors"
+                    >
+                      Close (Deletion Blocked)
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteFileModal({ isOpen: false, file: null });
+                          setDeleteFileError(null);
+                        }}
+                        disabled={isDeletingFile}
+                        className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteDigitalFile}
+                        disabled={isDeletingFile}
+                        className="px-4 py-1.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+                      >
+                        {isDeletingFile && <Loader2 className="w-3 h-3 animate-spin" />}
+                        <span>Delete File</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

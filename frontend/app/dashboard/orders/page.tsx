@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Receipt,
   Download,
+  FileDown,
   AlertCircle,
   PackageOpen,
   ArrowUpDown,
@@ -35,6 +36,7 @@ import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 
 interface OrderItem {
   id: number;
+  product_id?: string;
   product_name_snapshot: string;
   variant_name_snapshot: string;
   price_at_purchase: number;
@@ -44,6 +46,13 @@ interface OrderItem {
   product_key?: {
     key_value: string;
   };
+  digital_files?: Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes?: number;
+    status: string;
+  }>;
 }
 
 interface Order {
@@ -472,13 +481,13 @@ export default function OrderHistoryPage() {
                 <tbody className="divide-y divide-white/[0.06] text-xs">
                   {filteredOrders.map((order) => {
                     const firstItem = order.items[0];
-                    const keyValue = firstItem?.product_key?.key_value;
-                    const isRedeemCode =
-                      (firstItem?.category && firstItem.category.toLowerCase().includes("redeem")) ||
-                      (firstItem?.product_name_snapshot &&
-                        (firstItem.product_name_snapshot.toLowerCase().includes("voucher") ||
-                          firstItem.product_name_snapshot.toLowerCase().includes("redeem") ||
-                          firstItem.product_name_snapshot.toLowerCase().includes("code")));
+                    const itemsCount = order.items?.length || 0;
+                    const isCompleted = order.status === "COMPLETED";
+                    const isPaymentSuccessful = (order.payment_status || "").toUpperCase() === "SUCCESSFUL";
+                    const isEntitled = isCompleted && isPaymentSuccessful;
+
+                    const allDigitalFiles = order.items?.flatMap((it) => it.digital_files || []) || [];
+                    const allKeys = order.items?.filter((it) => it.product_key?.key_value) || [];
 
                     const faceVal = firstItem?.face_value;
                     const paidPrice = firstItem?.price_at_purchase ?? order.total_amount;
@@ -497,6 +506,11 @@ export default function OrderHistoryPage() {
                           </div>
                           <div className="text-xs text-gray-300 font-medium mt-0.5">
                             {firstItem?.product_name_snapshot || "Digital Marketplace Item"}
+                            {itemsCount > 1 && (
+                              <span className="ml-1 text-[11px] font-mono text-cyan-400 font-semibold">
+                                (+{itemsCount - 1} more item{itemsCount > 2 ? "s" : ""})
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.2 rounded font-semibold">
@@ -544,39 +558,98 @@ export default function OrderHistoryPage() {
                           <div className="space-y-1">
                             {getStatusBadge(order.status)}
                             <div className="text-[10px] text-gray-400 font-mono">
-                              Payment: Successful
+                              Payment: {order.payment_status || "Pending"}
                             </div>
                           </div>
                         </td>
 
-                        {/* Delivered Code / License Key */}
+                        {/* Delivered Code / Digital Files / License Key */}
                         <td className="py-4 px-4">
-                          {order.status === "COMPLETED" && keyValue ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-primary/25 bg-primary/10">
-                              <KeyRound className="w-3 h-3 text-primary shrink-0" />
-                              <code className="text-xs font-mono text-white select-all truncate max-w-[140px] font-bold">
-                                {keyValue}
-                              </code>
-                              <button
-                                onClick={() => handleCopy(keyValue)}
-                                className="p-1 rounded hover:bg-white/10 text-gray-300 hover:text-white transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center"
-                                title={isRedeemCode ? "Copy Redeem Code" : "Copy Key"}
-                                aria-label="Copy Code"
-                              >
-                                {copiedKey === keyValue ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
+                          <div className="space-y-1.5">
+                            {isEntitled && allKeys.length > 0 && (
+                              <div className="space-y-1">
+                                {allKeys.slice(0, 1).map((kItem, kIdx) => {
+                                  const keyValue = kItem.product_key!.key_value;
+                                  const isRedeemCode =
+                                    (kItem.category && kItem.category.toLowerCase().includes("redeem")) ||
+                                    (kItem.product_name_snapshot &&
+                                      (kItem.product_name_snapshot.toLowerCase().includes("voucher") ||
+                                        kItem.product_name_snapshot.toLowerCase().includes("redeem") ||
+                                        kItem.product_name_snapshot.toLowerCase().includes("code")));
+
+                                  return (
+                                    <div
+                                      key={kIdx}
+                                      className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/10"
+                                    >
+                                      <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                                        <KeyRound className="w-3.5 h-3.5 text-primary shrink-0" />
+                                        <code className="text-xs font-mono text-white truncate select-all font-bold">
+                                          {keyValue}
+                                        </code>
+                                      </div>
+                                      <button
+                                        onClick={() => handleCopy(keyValue)}
+                                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white transition-colors shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                                        title={isRedeemCode ? "Copy Redeem Code" : "Copy Key"}
+                                        aria-label="Copy Code"
+                                      >
+                                        {copiedKey === keyValue ? (
+                                          <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />
+                                        ) : (
+                                          <Copy className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                                {allKeys.length > 1 && (
+                                  <button
+                                    onClick={() => openOrderDetails(order)}
+                                    className="text-[10px] font-mono text-primary hover:underline block"
+                                  >
+                                    +{allKeys.length - 1} more license key(s)
+                                  </button>
                                 )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-gray-500 font-mono italic">
-                              {order.status === "COMPLETED"
-                                ? "Fulfilled"
-                                : "Pending Fulfillment"}
-                            </span>
-                          )}
+                              </div>
+                            )}
+
+                            {isEntitled && allDigitalFiles.length > 0 && (
+                              <div className="p-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileDown className="w-4 h-4 text-cyan-400 shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="text-xs font-mono font-bold text-white block truncate">
+                                      {allDigitalFiles.length === 1
+                                        ? allDigitalFiles[0].filename
+                                        : `${allDigitalFiles.length} Digital Files Ready`}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-cyan-300/80">Available for Download</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => openOrderDetails(order)}
+                                  className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 text-xs font-mono font-bold transition-colors shrink-0"
+                                >
+                                  Download
+                                </button>
+                              </div>
+                            )}
+
+                            {!isEntitled && (
+                              <span className="text-[11px] text-gray-500 font-mono italic">
+                                {isCompleted
+                                  ? "Payment Verification Pending"
+                                  : "Pending Fulfillment"}
+                              </span>
+                            )}
+
+                            {isEntitled && allKeys.length === 0 && allDigitalFiles.length === 0 && (
+                              <span className="text-[11px] text-gray-500 font-mono italic">
+                                Fulfilled
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Action */}
@@ -600,13 +673,13 @@ export default function OrderHistoryPage() {
             <div className="lg:hidden space-y-3.5">
               {filteredOrders.map((order) => {
                 const firstItem = order.items[0];
-                const keyValue = firstItem?.product_key?.key_value;
-                const isRedeemCode =
-                  (firstItem?.category && firstItem.category.toLowerCase().includes("redeem")) ||
-                  (firstItem?.product_name_snapshot &&
-                    (firstItem.product_name_snapshot.toLowerCase().includes("voucher") ||
-                      firstItem.product_name_snapshot.toLowerCase().includes("redeem") ||
-                      firstItem.product_name_snapshot.toLowerCase().includes("code")));
+                const itemsCount = order.items?.length || 0;
+                const isCompleted = order.status === "COMPLETED";
+                const isPaymentSuccessful = (order.payment_status || "").toUpperCase() === "SUCCESSFUL";
+                const isEntitled = isCompleted && isPaymentSuccessful;
+
+                const allDigitalFiles = order.items?.flatMap((it) => it.digital_files || []) || [];
+                const allKeys = order.items?.filter((it) => it.product_key?.key_value) || [];
 
                 const faceVal = firstItem?.face_value;
                 const paidPrice = firstItem?.price_at_purchase ?? order.total_amount;
@@ -642,6 +715,11 @@ export default function OrderHistoryPage() {
                     <div>
                       <div className="font-bold text-white text-sm">
                         {firstItem?.product_name_snapshot || "Digital Marketplace Item"}
+                        {itemsCount > 1 && (
+                          <span className="ml-1 text-[11px] font-mono text-cyan-400 font-semibold">
+                            (+{itemsCount - 1} more item{itemsCount > 2 ? "s" : ""})
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md font-semibold">
@@ -670,32 +748,71 @@ export default function OrderHistoryPage() {
                       </span>
                     </div>
 
-                    {order.status === "COMPLETED" && keyValue && (
-                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/10">
-                        <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                          <KeyRound className="w-3.5 h-3.5 text-primary shrink-0" />
-                          <code className="text-xs font-mono text-white truncate select-all font-bold">
-                            {keyValue}
-                          </code>
+                    {isEntitled && allKeys.length > 0 && (
+                      <div className="space-y-1.5">
+                        {allKeys.slice(0, 1).map((kItem, kIdx) => {
+                          const keyValue = kItem.product_key!.key_value;
+                          const isRedeemCode =
+                            (kItem.category && kItem.category.toLowerCase().includes("redeem")) ||
+                            (kItem.product_name_snapshot &&
+                              (kItem.product_name_snapshot.toLowerCase().includes("voucher") ||
+                                kItem.product_name_snapshot.toLowerCase().includes("redeem") ||
+                                kItem.product_name_snapshot.toLowerCase().includes("code")));
+
+                          return (
+                            <div
+                              key={kIdx}
+                              className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-primary/20 bg-primary/10"
+                            >
+                              <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                                <KeyRound className="w-3.5 h-3.5 text-primary shrink-0" />
+                                <code className="text-xs font-mono text-white truncate select-all font-bold">
+                                  {keyValue}
+                                </code>
+                              </div>
+                              <button
+                                onClick={() => handleCopy(keyValue)}
+                                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white transition-colors shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                                title={isRedeemCode ? "Copy Redeem Code" : "Copy Key"}
+                                aria-label="Copy Code"
+                              >
+                                {copiedKey === keyValue ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {isEntitled && allDigitalFiles.length > 0 && (
+                      <div className="p-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileDown className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-xs font-mono font-bold text-white block truncate">
+                              {allDigitalFiles.length === 1
+                                ? allDigitalFiles[0].filename
+                                : `${allDigitalFiles.length} Digital Files Ready`}
+                            </span>
+                            <span className="text-[10px] font-mono text-cyan-300/80">Available for Download</span>
+                          </div>
                         </div>
                         <button
-                          onClick={() => handleCopy(keyValue)}
-                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-gray-200 hover:text-white transition-colors shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center"
-                          title={isRedeemCode ? "Copy Redeem Code" : "Copy Key"}
-                          aria-label="Copy Code"
+                          onClick={() => openOrderDetails(order)}
+                          className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 text-xs font-mono font-bold transition-colors shrink-0"
                         >
-                          {copiedKey === keyValue ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400 font-bold" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
+                          Download
                         </button>
                       </div>
                     )}
 
                     <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between">
                       <span className="text-[10px] text-gray-400 font-mono">
-                        Payment: Successful
+                        Payment: {order.payment_status || "Pending"}
                       </span>
                       <button
                         onClick={() => openOrderDetails(order)}

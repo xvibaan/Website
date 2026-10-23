@@ -1170,6 +1170,65 @@ class AdminApiClient {
       method: 'DELETE',
     });
   }
+  // Digital Files (Cloudflare R2 Direct Uploads)
+  async getProductDigitalFiles(productId: string) {
+    return this.request<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        productId: string;
+        originalFilename: string;
+        mimeType: string;
+        sizeBytes: number;
+        status: 'PENDING_UPLOAD' | 'READY' | 'FAILED' | 'DELETING' | string;
+        uploadedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      completedOrdersCount?: number;
+    }>(`/digital-files/product/${productId}`);
+  }
+
+  async initiateDigitalFileUpload(data: {
+    productId: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      fileId: string;
+      status: string;
+      uploadUrl: string;
+      expiresInSeconds: number;
+      requiredHeaders: Record<string, string>;
+    }>('/digital-files/upload/initiate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async completeDigitalFileUpload(fileId: string) {
+    return this.request<{
+      success: boolean;
+      fileId: string;
+      status: string;
+      sizeBytes?: number;
+    }>(`/digital-files/${fileId}/complete`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteProductDigitalFile(fileId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      fileId?: string;
+      completedOrdersCount?: number;
+    }>(`/digital-files/${fileId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const adminApi = new AdminApiClient();
