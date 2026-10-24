@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS "famapp_email_events" (
+CREATE TABLE IF NOT EXISTS "famapp_email_events" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "gmail_message_id" varchar(255) NOT NULL UNIQUE,
   "gmail_thread_id" varchar(255),
