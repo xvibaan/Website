@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { DigitalFileDownloadSection } from "./DigitalFileDownloadSection";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -231,8 +232,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                           </div>
                         </div>
 
-                        {/* Delivered Code / Key Delivery Section */}
-                        {keyValue ? (
+                                                {/* Delivered Code / Key Delivery Section */}
+                        {keyValue && (
                           <div className="p-3.5 rounded-xl bg-black/40 border border-primary/30 space-y-2.5">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-mono text-gray-300 flex items-center gap-1.5 uppercase font-bold tracking-wider">
@@ -247,7 +248,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
 
                             <div className="flex items-center gap-2">
                               <div className="flex-1 bg-black/70 border border-white/10 px-3 py-2.5 rounded-xl font-mono text-xs sm:text-sm text-white overflow-x-auto select-all break-all tracking-wider font-bold">
-                                {isRevealed ? keyValue : "••••••••-••••-••••-••••"}
+                                {isRevealed ? keyValue : "????????-????-????-????"}
                               </div>
 
                               <button
@@ -275,10 +276,22 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                               </button>
                             </div>
                           </div>
-                        ) : (
+                        )}
+
+                        {/* Digital Deliverable Files Download Section */}
+                        {item.digital_files && item.digital_files.length > 0 && (
+                          <DigitalFileDownloadSection
+                            files={item.digital_files}
+                            orderStatus={order.status}
+                            paymentStatus={order.payment_status}
+                          />
+                        )}
+
+                        {/* Pending Fulfillment Fallback when neither key nor files are ready */}
+                        {!keyValue && (!item.digital_files || item.digital_files.length === 0) && (
                           <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/10 flex items-center gap-2.5 text-xs text-gray-400 font-mono">
                             <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                            <span>Your code will appear here after fulfillment.</span>
+                            <span>Your deliverable will appear here once fulfillment completes.</span>
                           </div>
                         )}
                         {/* Resource links */}

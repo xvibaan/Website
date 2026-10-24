@@ -17,3 +17,6 @@ export * from './resellers';
 export * from './reseller-wallets';
 export * from './reseller-wallet-ledger';
 export * from './website-instances';
+export * from './product-digital-files';
+export * from './product-provider-offers';
+export * from './famapp';

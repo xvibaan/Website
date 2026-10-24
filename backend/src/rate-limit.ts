@@ -176,4 +176,17 @@ export const rateLimitOverrides = {
       },
     },
   },
+
+  /**
+   * Customer digital file download: 15 per minute per IP.
+   * Protects presigned download URL generation and private asset egress from abuse.
+   */
+  digitalDownload: {
+    config: {
+      rateLimit: {
+        max: 15,
+        timeWindow: '1 minute',
+      },
+    },
+  },
 } as const;

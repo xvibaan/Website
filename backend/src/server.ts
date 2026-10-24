@@ -13,12 +13,14 @@ import { authRoutes } from './auth/auth.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { walletRoutes } from './wallet/wallet.routes';
 import { paymentRoutes } from './payments/routes/payment.routes';
+import { famappRoutes, famappAdminRoutes, famappScheduler } from './payments/famapp';
 import { providerRoutes } from './providers/routes/provider.routes';
 import { providerRegistry } from './providers/registry/ProviderRegistry';
 import { DevelopmentProviderAdapter } from './providers/adapters/development/DevelopmentProviderAdapter';
 import { catalogRoutes } from './catalog/catalog.routes';
 import { contentRoutes } from './content/content.routes';
 import { orderRoutes } from './orders/orders.routes';
+import { digitalFileRoutes } from './digital-files/digital-files.routes';
 import { settingsAdminService } from './admin/services/settings.service';
 import { orderService } from './orders/order.service';
 import { resellerRoutes } from './reseller/reseller.routes';
@@ -215,6 +217,9 @@ export function buildServer(): FastifyInstance {
 
   // Central Payment Gateway & Webhook API Routes
   app.register(paymentRoutes, { prefix: '/api/v1/payments' });
+  // FamApp Static UPI QR & Gmail Payment Verification Routes
+  app.register(famappRoutes, { prefix: '/api/v1/payments/famapp' });
+  app.register(famappAdminRoutes, { prefix: '/api/v1/admin/payments/famapp' });
 
   // Protected Master Admin API Routes (RBAC Boundary, Providers, Products, Customers, Analytics, Settings)
   app.register(adminRoutes, { prefix: '/api/v1/admin' });
@@ -253,6 +258,9 @@ export function buildServer(): FastifyInstance {
 
   // Customer Orders API Routes (Phase 8 placeholder)
   app.register(orderRoutes, { prefix: '/api/v1/orders' });
+
+  // Authenticated customer access to purchased private digital files.
+  app.register(digitalFileRoutes, { prefix: '/api/v1/digital-files' });
 
   // Reseller API Routes
   app.register(resellerRoutes, { prefix: '/api/v1/reseller', ...rateLimitOverrides.resellerApi.config });

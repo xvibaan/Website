@@ -1170,6 +1170,174 @@ class AdminApiClient {
       method: 'DELETE',
     });
   }
+  // Digital Files (Cloudflare R2 Direct Uploads)
+  async getProductDigitalFiles(productId: string) {
+    return this.request<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        productId: string;
+        originalFilename: string;
+        mimeType: string;
+        sizeBytes: number;
+        status: 'PENDING_UPLOAD' | 'READY' | 'FAILED' | 'DELETING' | string;
+        uploadedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      completedOrdersCount?: number;
+    }>(`/digital-files/product/${productId}`);
+  }
+
+  async initiateDigitalFileUpload(data: {
+    productId: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+  }) {
+    return this.request<{
+      success: boolean;
+      fileId: string;
+      status: string;
+      uploadUrl: string;
+      expiresInSeconds: number;
+      requiredHeaders: Record<string, string>;
+    }>('/digital-files/upload/initiate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async completeDigitalFileUpload(fileId: string) {
+    return this.request<{
+      success: boolean;
+      fileId: string;
+      status: string;
+      sizeBytes?: number;
+    }>(`/digital-files/${fileId}/complete`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteProductDigitalFile(fileId: string) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      fileId?: string;
+      completedOrdersCount?: number;
+    }>(`/digital-files/${fileId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // =========================================================================
+  // FamApp UPI Payment Verification
+  // =========================================================================
+
+  async getFamappStats() {
+    return this.request<{
+      success: boolean;
+      stats: {
+        totalSubmissions: number;
+        pendingCount: number;
+        creditedCount: number;
+        manualReviewCount: number;
+        expiredCount: number;
+        rejectedCount: number;
+        totalEmailEvents: number;
+        unclaimedEventsCount: number;
+        claimedEventsCount: number;
+        flaggedEventsCount: number;
+      };
+    }>('/payments/famapp/stats');
+  }
+
+  async getFamappSubmissions(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    utr?: string;
+    userId?: string;
+  } = {}) {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', params.page.toString());
+    if (params.limit) query.set('limit', params.limit.toString());
+    if (params.status && params.status !== 'ALL') query.set('status', params.status);
+    if (params.utr) query.set('utr', params.utr);
+    if (params.userId) query.set('userId', params.userId);
+
+    const qs = query.toString();
+    return this.request<{
+      success: boolean;
+      submissions: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/payments/famapp/submissions${qs ? `?${qs}` : ''}`);
+  }
+
+  async getFamappEmailEvents(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    utr?: string;
+  } = {}) {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', params.page.toString());
+    if (params.limit) query.set('limit', params.limit.toString());
+    if (params.status && params.status !== 'ALL') query.set('status', params.status);
+    if (params.utr) query.set('utr', params.utr);
+
+    const qs = query.toString();
+    return this.request<{
+      success: boolean;
+      emailEvents: any[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }>(`/payments/famapp/email-events${qs ? `?${qs}` : ''}`);
+  }
+
+  async reviewFamappSubmission(id: string, data: {
+    action: 'APPROVE' | 'OVERRIDE_APPROVE' | 'REJECT';
+    reason?: string;
+    settlementConfirmed?: boolean;
+  }) {
+    return this.request<{
+      success: boolean;
+      credited: boolean;
+      status: string;
+      message: string;
+      submissionId: string;
+      paymentTransactionId?: string;
+    }>(`/payments/famapp/submissions/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFamappSyncStatus() {
+    return this.request<{
+      success: boolean;
+      syncStatus: {
+        id: string;
+        lastHistoryId?: string;
+        lastSyncedMessageTimestamp?: string;
+        lastSyncedAt: string;
+        consecutiveErrors: string;
+        lastError?: string;
+      };
+      isConfigured: boolean;
+      merchantVpa: string;
+      autoCreditEnabled: boolean;
+    }>('/payments/famapp/sync-status');
+  }
 }
 
 export const adminApi = new AdminApiClient();

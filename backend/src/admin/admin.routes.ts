@@ -14,6 +14,7 @@ import { walletAdminRoutes } from './routes/wallets.routes';
 import { paymentAdminRoutes } from './routes/payments.routes';
 import { providerRoutes } from '../providers/routes/provider.routes';
 import { mediaAdminRoutes } from './routes/media.routes';
+import { digitalFileAdminRoutes } from './routes/digital-files.routes';
 import { alertRoutes } from './routes/alert.routes';
 import { resellerAdminRoutes } from './routes/resellers.routes';
 import { websiteInstanceAdminRoutes } from './routes/website-instances.routes';
@@ -75,6 +76,8 @@ export const adminRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   // Product Media Upload & Management (Phase 3C)
   app.register(mediaAdminRoutes, { prefix: '/media' });
+  // Private digital-file upload API (admin-only boundary).
+  app.register(digitalFileAdminRoutes, { prefix: '/digital-files' });
 
   // System Alerts (Operational Monitoring)
   // System Alerts (Operational Monitoring)

@@ -6,7 +6,7 @@ async function runMigration() {
   console.log('Running database migrations...');
   const db = getDb();
   try {
-    const migrationsFolder = path.join(process.cwd(), 'src/db/migrations');
+    const migrationsFolder = process.env.MIGRATIONS_FOLDER || path.join(process.cwd(), 'src/db/migrations');
     await migrate(db, { migrationsFolder });
     console.log('Migrations completed successfully.');
   } catch (error) {
